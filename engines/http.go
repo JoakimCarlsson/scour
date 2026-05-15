@@ -83,6 +83,14 @@ var httpClient = func() *http.Client {
 }()
 
 func fetch(req *http.Request) ([]byte, error) {
+	_, body, err := fetchWithHeaders(req)
+	return body, err
+}
+
+// fetchWithHeaders is fetch() but also returns the response so callers
+// that need to inspect response headers (e.g. Yandex's x-yandex-captcha)
+// can do so. The response Body has already been read and closed.
+func fetchWithHeaders(req *http.Request) (*http.Response, []byte, error) {
 	if req.Header.Get("User-Agent") == "" {
 		if ua := randomUserAgent(); ua != "" {
 			req.Header.Set("User-Agent", ua)
@@ -93,17 +101,17 @@ func fetch(req *http.Request) ([]byte, error) {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return nil, err
+		return resp, nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, &httpError{Status: resp.StatusCode}
+		return resp, body, &httpError{Status: resp.StatusCode}
 	}
-	return body, nil
+	return resp, body, nil
 }
 
 type httpError struct {
