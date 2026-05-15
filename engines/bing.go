@@ -59,6 +59,14 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error)
 	case query.SafeStrict:
 		v.Set("adlt", "strict")
 	}
+	switch q.TimeRange {
+	case query.TimeRangeDay:
+		v.Set("filters", `ex1:"ez1"`)
+	case query.TimeRangeWeek:
+		v.Set("filters", `ex1:"ez2"`)
+	case query.TimeRangeMonth:
+		v.Set("filters", `ex1:"ez3"`)
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

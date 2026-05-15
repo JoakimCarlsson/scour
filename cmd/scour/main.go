@@ -23,6 +23,7 @@ func main() {
 	jsonOut := flag.Bool("json", false, "emit results as JSON")
 	enginesCSV := flag.String("engines", "", "comma-separated engine allowlist")
 	safeSearch := flag.String("safesearch", "moderate", "safesearch level: off|moderate|strict")
+	timeRange := flag.String("timerange", "", "time range: day|week|month|year (default: any)")
 	flag.Parse()
 
 	raw := strings.TrimSpace(strings.Join(flag.Args(), " "))
@@ -43,11 +44,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "scour: invalid --safesearch %q\n", *safeSearch)
 		os.Exit(1)
 	}
+	tr, ok := query.ParseTimeRange(*timeRange)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "scour: invalid --timerange %q\n", *timeRange)
+		os.Exit(1)
+	}
 	prefs := pipeline.Preferences{
 		Preferences: query.Preferences{
 			DefaultLanguage:   "en",
 			DefaultCategory:   query.CategoryGeneral,
 			DefaultSafeSearch: safe,
+			DefaultTimeRange:  tr,
 		},
 		Timeout: *timeout,
 	}

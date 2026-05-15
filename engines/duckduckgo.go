@@ -59,6 +59,16 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, 
 	case query.SafeStrict:
 		form.Set("kp", "1")
 	}
+	switch q.TimeRange {
+	case query.TimeRangeDay:
+		form.Set("df", "d")
+	case query.TimeRangeWeek:
+		form.Set("df", "w")
+	case query.TimeRangeMonth:
+		form.Set("df", "m")
+	case query.TimeRangeYear:
+		form.Set("df", "y")
+	}
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,

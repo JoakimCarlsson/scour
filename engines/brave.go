@@ -59,6 +59,16 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) ([]Result, error
 	case query.SafeStrict:
 		v.Set("safesearch", "strict")
 	}
+	switch q.TimeRange {
+	case query.TimeRangeDay:
+		v.Set("tf", "pd")
+	case query.TimeRangeWeek:
+		v.Set("tf", "pw")
+	case query.TimeRangeMonth:
+		v.Set("tf", "pm")
+	case query.TimeRangeYear:
+		v.Set("tf", "py")
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

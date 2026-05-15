@@ -60,6 +60,16 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, erro
 	case query.SafeModerate, query.SafeStrict:
 		v.Set("safe", "active")
 	}
+	switch q.TimeRange {
+	case query.TimeRangeDay:
+		v.Set("tbs", "qdr:d")
+	case query.TimeRangeWeek:
+		v.Set("tbs", "qdr:w")
+	case query.TimeRangeMonth:
+		v.Set("tbs", "qdr:m")
+	case query.TimeRangeYear:
+		v.Set("tbs", "qdr:y")
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

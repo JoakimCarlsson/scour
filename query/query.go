@@ -13,12 +13,14 @@ type Query struct {
 	Category   Category
 	Engines    []string
 	SafeSearch SafeLevel
+	TimeRange  TimeRange
 }
 
 type Preferences struct {
 	DefaultLanguage   string
 	DefaultCategory   Category
 	DefaultSafeSearch SafeLevel
+	DefaultTimeRange  TimeRange
 }
 
 var ErrEmptyQuery = errors.New("query: empty terms after parsing")
@@ -37,6 +39,7 @@ func Parse(raw string, prefs Preferences) (Query, error) {
 		Category:   cat,
 		Language:   prefs.DefaultLanguage,
 		SafeSearch: prefs.DefaultSafeSearch,
+		TimeRange:  prefs.DefaultTimeRange,
 	}
 
 	var terms []string
@@ -63,6 +66,10 @@ func Parse(raw string, prefs Preferences) (Query, error) {
 			val := t[1:]
 			if c, ok := ParseCategory(val); ok {
 				q.Category = c
+				continue
+			}
+			if tr, ok := ParseTimeRange(val); ok && tr != TimeRangeAny {
+				q.TimeRange = tr
 				continue
 			}
 			if looksLikeBCP47(val) {

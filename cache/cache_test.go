@@ -35,6 +35,14 @@ func TestKeyForDiffersOnContent(t *testing.T) {
 	}
 }
 
+func TestKeyForIncludesTimeRange(t *testing.T) {
+	a := query.Query{Terms: "news", TimeRange: query.TimeRangeDay}
+	b := query.Query{Terms: "news", TimeRange: query.TimeRangeWeek}
+	if KeyFor(a) == KeyFor(b) {
+		t.Fatal("KeyFor collided across TimeRange")
+	}
+}
+
 func TestMemoryCacheGetSet(t *testing.T) {
 	c := NewMemory(0)
 	defer c.Close()
