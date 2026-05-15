@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/JoakimCarlsson/scour/cache"
+	"github.com/JoakimCarlsson/scour/engines"
 	"github.com/JoakimCarlsson/scour/pipeline"
 	"github.com/JoakimCarlsson/scour/query"
 	"github.com/JoakimCarlsson/scour/rank"
@@ -125,6 +126,7 @@ func emitPretty(out *pipeline.Output, limit int) {
 	for i, r := range results {
 		fmt.Printf("%d. [score=%.2f] %s\n", i+1, r.Score, r.Title)
 		fmt.Printf("   %s\n", r.URL)
+		printCategoryExtras(out.Query.Category, r.Extras)
 		if r.Snippet != "" {
 			fmt.Printf("   %s\n", truncate(r.Snippet, 120))
 		}
@@ -145,6 +147,36 @@ func formatSources(r rank.Ranked) string {
 		parts = append(parts, fmt.Sprintf("%s@%d", s.Engine, s.Position))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func printCategoryExtras(cat query.Category, x map[string]string) {
+	if len(x) == 0 {
+		return
+	}
+	switch cat {
+	case query.CategoryImages:
+		if v := x[engines.ExtraThumbnailURL]; v != "" {
+			fmt.Printf("   thumbnail: %s\n", v)
+		}
+		if w, h := x[engines.ExtraThumbnailWidth], x[engines.ExtraThumbnailHeight]; w != "" &&
+			h != "" {
+			fmt.Printf("   dimensions: %sx%s\n", w, h)
+		}
+	case query.CategoryVideos:
+		if v := x[engines.ExtraDuration]; v != "" {
+			fmt.Printf("   duration: %s\n", v)
+		}
+		if v := x[engines.ExtraThumbnailURL]; v != "" {
+			fmt.Printf("   thumbnail: %s\n", v)
+		}
+	case query.CategoryNews:
+		if v := x[engines.ExtraPublishedAt]; v != "" {
+			fmt.Printf("   published: %s\n", v)
+		}
+		if v := x[engines.ExtraAuthor]; v != "" {
+			fmt.Printf("   by: %s\n", v)
+		}
+	}
 }
 
 func truncate(s string, n int) string {

@@ -12,6 +12,7 @@ type Merged struct {
 	URL     string
 	Snippet string
 	Sources []Source
+	Extras  map[string]string
 }
 
 func Merge(in []engines.Result) []Merged {
@@ -33,6 +34,17 @@ func Merge(in []engines.Result) []Merged {
 		}
 		if len(r.Snippet) > len(m.Snippet) {
 			m.Snippet = r.Snippet
+		}
+		for k, v := range r.Extras {
+			if v == "" {
+				continue
+			}
+			if m.Extras == nil {
+				m.Extras = map[string]string{}
+			}
+			if existing, ok := m.Extras[k]; !ok || len(v) > len(existing) {
+				m.Extras[k] = v
+			}
 		}
 		m.Sources = append(m.Sources, Source{Engine: r.Engine, Position: r.Position})
 	}

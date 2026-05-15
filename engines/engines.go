@@ -15,7 +15,20 @@ type Result struct {
 	Snippet  string
 	Engine   string
 	Position int
+	Extras   map[string]string
 }
+
+// Well-known Extras keys. Engines populate only the keys they have.
+const (
+	ExtraThumbnailURL    = "thumbnail_url"
+	ExtraThumbnailWidth  = "thumbnail_width"
+	ExtraThumbnailHeight = "thumbnail_height"
+	ExtraDuration        = "duration"
+	ExtraPublishedAt     = "published_at"
+	ExtraAuthor          = "author"
+	ExtraLatitude        = "latitude"
+	ExtraLongitude       = "longitude"
+)
 
 type LanguageTraits struct {
 	All       bool
