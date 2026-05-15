@@ -2,12 +2,26 @@ package engines
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/JoakimCarlsson/scour/query"
 )
+
+type stubEngine struct {
+	name       string
+	categories []query.Category
+	languages  []string
+	weight     float64
+}
+
+func (s stubEngine) Name() string                 { return s.name }
+func (s stubEngine) Categories() []query.Category { return s.categories }
+func (s stubEngine) Languages() []string          { return s.languages }
+func (s stubEngine) Weight() float64              { return s.weight }
+func (s stubEngine) Search(_ context.Context, _ query.Query) ([]Result, error) {
+	return nil, nil
+}
 
 func names(es []Engine) []string {
 	if len(es) == 0 {
@@ -28,7 +42,7 @@ func TestSelect(t *testing.T) {
 		want  []string
 	}{
 		{
-			name: "default general query returns all stubs alphabetically",
+			name: "default general query returns all engines alphabetically",
 			q:    query.Query{Category: query.CategoryGeneral, Language: "en"},
 			want: []string{"bing", "brave", "duckduckgo", "google"},
 		},
@@ -50,7 +64,7 @@ func TestSelect(t *testing.T) {
 			want:  nil,
 		},
 		{
-			name: "images category returns all stubs",
+			name: "images category returns all engines",
 			q:    query.Query{Category: query.CategoryImages},
 			want: []string{"bing", "brave", "duckduckgo", "google"},
 		},
@@ -124,18 +138,6 @@ func TestSupportsLanguage(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestStubSearchReturnsNotImplemented(t *testing.T) {
-	for _, e := range All() {
-		got, err := e.Search(context.Background(), query.Query{})
-		if got != nil {
-			t.Errorf("%s.Search returned non-nil results: %v", e.Name(), got)
-		}
-		if !errors.Is(err, ErrNotImplemented) {
-			t.Errorf("%s.Search err = %v, want ErrNotImplemented", e.Name(), err)
-		}
 	}
 }
 

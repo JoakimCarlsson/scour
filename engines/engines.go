@@ -2,7 +2,6 @@ package engines
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -10,10 +9,11 @@ import (
 )
 
 type Result struct {
-	Title   string
-	URL     string
-	Snippet string
-	Engine  string
+	Title    string
+	URL      string
+	Snippet  string
+	Engine   string
+	Position int
 }
 
 type Engine interface {
@@ -27,8 +27,6 @@ type Engine interface {
 type Preferences struct {
 	DisabledEngines []string
 }
-
-var ErrNotImplemented = errors.New("engines: search not implemented")
 
 var registry = map[string]Engine{}
 

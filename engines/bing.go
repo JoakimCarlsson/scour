@@ -1,0 +1,81 @@
+package engines
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+
+	"github.com/JoakimCarlsson/scour/query"
+)
+
+const bingURL = "https://www.bing.com/search"
+
+type bingEngine struct{}
+
+func (bingEngine) Name() string { return "bing" }
+func (bingEngine) Categories() []query.Category {
+	return []query.Category{
+		query.CategoryGeneral,
+		query.CategoryNews,
+		query.CategoryImages,
+		query.CategoryVideos,
+	}
+}
+func (bingEngine) Languages() []string { return []string{"*"} }
+func (bingEngine) Weight() float64     { return 1.0 }
+
+func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
+	u, _ := url.Parse(bingURL)
+	v := u.Query()
+	v.Set("q", q.Terms)
+	v.Set("form", "QBLH")
+	u.RawQuery = v.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := fetch(req)
+	if err != nil {
+		return nil, err
+	}
+	return parseBing(body)
+}
+
+func parseBing(body []byte) ([]Result, error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	var results []Result
+	pos := 0
+	doc.Find("li.b_algo").Each(func(_ int, s *goquery.Selection) {
+		titleEl := s.Find("h2 a").First()
+		title := strings.TrimSpace(titleEl.Text())
+		href, _ := titleEl.Attr("href")
+		snippet := strings.TrimSpace(s.Find(".b_caption p").First().Text())
+		if title == "" || href == "" {
+			return
+		}
+		pos++
+		results = append(results, Result{
+			Title:    title,
+			URL:      href,
+			Snippet:  snippet,
+			Engine:   "bing",
+			Position: pos,
+		})
+	})
+	if len(results) == 0 {
+		return nil, fmt.Errorf("bing: no results parsed")
+	}
+	return results, nil
+}
+
+func init() {
+	Register(bingEngine{})
+}
