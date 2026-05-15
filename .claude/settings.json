@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "gofmt -s -w . 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "out=$(make check 2>&1); if [ $? -ne 0 ]; then echo \"make check failed — fix before stopping:\" >&2; echo \"$out\" >&2; exit 2; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
