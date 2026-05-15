@@ -51,6 +51,14 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, 
 		kl = loc
 	}
 	form.Set("kl", kl)
+	switch q.SafeSearch {
+	case query.SafeOff:
+		form.Set("kp", "-2")
+	case query.SafeModerate:
+		form.Set("kp", "-1")
+	case query.SafeStrict:
+		form.Set("kp", "1")
+	}
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,

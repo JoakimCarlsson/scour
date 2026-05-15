@@ -22,6 +22,7 @@ func main() {
 	limit := flag.Int("limit", 20, "max results printed")
 	jsonOut := flag.Bool("json", false, "emit results as JSON")
 	enginesCSV := flag.String("engines", "", "comma-separated engine allowlist")
+	safeSearch := flag.String("safesearch", "moderate", "safesearch level: off|moderate|strict")
 	flag.Parse()
 
 	raw := strings.TrimSpace(strings.Join(flag.Args(), " "))
@@ -37,10 +38,16 @@ func main() {
 	defer mem.Close()
 	p := pipeline.New(mem)
 
+	safe, ok := query.ParseSafeLevel(*safeSearch)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "scour: invalid --safesearch %q\n", *safeSearch)
+		os.Exit(1)
+	}
 	prefs := pipeline.Preferences{
 		Preferences: query.Preferences{
-			DefaultLanguage: "en",
-			DefaultCategory: query.CategoryGeneral,
+			DefaultLanguage:   "en",
+			DefaultCategory:   query.CategoryGeneral,
+			DefaultSafeSearch: safe,
 		},
 		Timeout: *timeout,
 	}

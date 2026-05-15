@@ -51,6 +51,14 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error)
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		v.Set("setlang", loc)
 	}
+	switch q.SafeSearch {
+	case query.SafeOff:
+		v.Set("adlt", "off")
+	case query.SafeModerate:
+		v.Set("adlt", "moderate")
+	case query.SafeStrict:
+		v.Set("adlt", "strict")
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

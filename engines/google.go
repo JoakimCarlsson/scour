@@ -54,6 +54,12 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, erro
 	}
 	v.Set("hl", hl)
 	v.Set("num", "20")
+	switch q.SafeSearch {
+	case query.SafeOff:
+		v.Set("safe", "off")
+	case query.SafeModerate, query.SafeStrict:
+		v.Set("safe", "active")
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
