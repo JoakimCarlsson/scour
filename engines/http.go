@@ -18,8 +18,12 @@ var httpClient = &http.Client{
 }
 
 func fetch(req *http.Request) ([]byte, error) {
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", userAgent)
+	}
+	if req.Header.Get("Accept-Language") == "" {
+		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err

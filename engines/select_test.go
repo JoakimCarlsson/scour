@@ -91,7 +91,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "news category returns news-capable engines",
 			q:    query.Query{Category: query.CategoryNews},
-			want: []string{"bing", "brave", "qwant"},
+			want: []string{"bing", "brave", "google", "qwant"},
 		},
 		{
 			name: "map category returns nothing",
