@@ -119,6 +119,16 @@ func (e startpageEngine) Search(ctx context.Context, q query.Query) (Response, e
 	form.Set("abp", "1")
 	form.Set("abd", "1")
 	form.Set("abe", "1")
+	switch q.TimeRange {
+	case query.TimeRangeDay:
+		form.Set("with_date", "d")
+	case query.TimeRangeWeek:
+		form.Set("with_date", "w")
+	case query.TimeRangeMonth:
+		form.Set("with_date", "m")
+	case query.TimeRangeYear:
+		form.Set("with_date", "y")
+	}
 	if q.Page > 1 {
 		form.Set("page", fmt.Sprintf("%d", q.Page))
 		form.Set("segment", "startpage.udog")
