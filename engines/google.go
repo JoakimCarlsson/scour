@@ -94,10 +94,10 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 		return Response{}, err
 	}
 	if isGoogleConsent(body) {
-		return Response{}, fmt.Errorf("google: served consent page")
+		return Response{}, &EngineBlockedError{Engine: "google", Reason: BlockReasonConsentWall}
 	}
 	if isGoogleSorry(body) {
-		return Response{}, fmt.Errorf("google: served sorry/CAPTCHA page")
+		return Response{}, &EngineBlockedError{Engine: "google", Reason: BlockReasonCaptcha}
 	}
 	results, err := parseGoogle(body)
 	if err != nil {

@@ -57,7 +57,7 @@ func (e yandexEngine) Search(ctx context.Context, q query.Query) (Response, erro
 		return Response{}, err
 	}
 	if resp != nil && resp.Header.Get("x-yandex-captcha") == "captcha" {
-		return Response{}, fmt.Errorf("yandex: captcha challenge")
+		return Response{}, &EngineBlockedError{Engine: "yandex", Reason: BlockReasonCaptcha}
 	}
 	results, err := parseYandex(body)
 	if err != nil {
