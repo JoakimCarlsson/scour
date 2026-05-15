@@ -48,6 +48,10 @@ func defaultPlugins(p Preferences) []plugins.Plugin {
 		plugins.TrackerStrip{},
 		plugins.BadDomains{Domains: p.BadDomains},
 		plugins.AnswerMath{},
+		plugins.AnswerRandom{},
+		plugins.AnswerUnits{},
+		plugins.AnswerStats{},
+		plugins.AnswerCurrency{},
 		plugins.InfoboxWikipedia{},
 	}
 }
