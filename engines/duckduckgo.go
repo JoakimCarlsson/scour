@@ -56,13 +56,17 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) (Response, 
 		kl = loc
 	}
 	form.Set("kl", kl)
+	kp := ""
 	switch q.SafeSearch {
 	case query.SafeOff:
-		form.Set("kp", "-2")
+		kp = "-2"
 	case query.SafeModerate:
-		form.Set("kp", "-1")
+		kp = "-1"
 	case query.SafeStrict:
-		form.Set("kp", "1")
+		kp = "1"
+	}
+	if kp != "" {
+		form.Set("kp", kp)
 	}
 	switch q.TimeRange {
 	case query.TimeRangeDay:
@@ -84,6 +88,13 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) (Response, 
 		return Response{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if kp != "" {
+		// DDG also reads kp from the cookie; without it the html
+		// endpoint defaults to moderate regardless of form data.
+		req.Header.Set("Cookie", "kp="+kp+"; kl="+kl)
+	} else {
+		req.Header.Set("Cookie", "kl="+kl)
+	}
 	req.Header.Set("Sec-Fetch-Dest", "document")
 	req.Header.Set("Sec-Fetch-Mode", "navigate")
 	req.Header.Set("Sec-Fetch-Site", "same-origin")

@@ -15,6 +15,20 @@ import (
 
 var braveURL = "https://search.brave.com/search"
 
+// braveCookie builds Brave's session cookie. safesearch is cookie-driven
+// (the URL param is silently ignored); the others are required to look
+// like a normal session.
+func braveCookie(s query.SafeLevel) string {
+	val := "off"
+	switch s {
+	case query.SafeModerate:
+		val = "moderate"
+	case query.SafeStrict:
+		val = "strict"
+	}
+	return "safesearch=" + val + "; useLocation=0; summarizer=0"
+}
+
 type braveEngine struct{}
 
 func (braveEngine) Name() string { return "brave" }
@@ -55,14 +69,6 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) (Response, error
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		v.Set("country", loc)
 	}
-	switch q.SafeSearch {
-	case query.SafeOff:
-		v.Set("safesearch", "off")
-	case query.SafeModerate:
-		v.Set("safesearch", "moderate")
-	case query.SafeStrict:
-		v.Set("safesearch", "strict")
-	}
 	switch q.TimeRange {
 	case query.TimeRangeDay:
 		v.Set("tf", "pd")
@@ -78,6 +84,9 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) (Response, error
 	if err != nil {
 		return Response{}, err
 	}
+	// Brave's safesearch is cookie-driven, not URL. The `safesearch` query
+	// param is silently ignored; the cookie is what the backend reads.
+	req.Header.Set("Cookie", braveCookie(q.SafeSearch))
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err
@@ -159,6 +168,7 @@ func (braveEngine) searchNews(ctx context.Context, q query.Query) (Response, err
 	if err != nil {
 		return Response{}, err
 	}
+	req.Header.Set("Cookie", braveCookie(q.SafeSearch))
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err

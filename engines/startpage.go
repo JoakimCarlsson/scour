@@ -69,6 +69,37 @@ func startpageSC(ctx context.Context) (string, error) {
 	return startpageSCValue, nil
 }
 
+// startpagePreferenceCookie packs Startpage's preferences cookie. The
+// cookie format is keyEEEvalue joined by N1N. Critically:
+// disable_family_filter takes "1" for OFF and "0" for ON (inverted),
+// and the cookie controls the SERP family filter that the URL params
+// don't expose.
+func startpagePreferenceCookie(s query.SafeLevel, lang string) string {
+	filter := "0"
+	if s == query.SafeOff {
+		filter = "1"
+	}
+	entries := []string{
+		"date_time=world",
+		"disable_family_filter=" + filter,
+		"disable_open_in_new_window=0",
+		"enable_post_method=1",
+		"enable_proxy_safety_suggest=1",
+		"enable_stay_control=1",
+		"instant_answers=1",
+		"lang_homepage=s/device/" + lang + "/",
+		"num_of_results=10",
+		"suggestions=1",
+		"wt_unit=celsius",
+		"language=" + lang,
+		"language_ui=" + lang,
+	}
+	for i, e := range entries {
+		entries[i] = strings.Replace(e, "=", "EEE", 1)
+	}
+	return "preferences=" + strings.Join(entries, "N1N")
+}
+
 func (e startpageEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	sc, err := startpageSC(ctx)
 	if err != nil {
@@ -104,6 +135,7 @@ func (e startpageEngine) Search(ctx context.Context, q query.Query) (Response, e
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.startpage.com")
 	req.Header.Set("Referer", "https://www.startpage.com/")
+	req.Header.Set("Cookie", startpagePreferenceCookie(q.SafeSearch, lang))
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err

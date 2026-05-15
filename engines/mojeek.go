@@ -29,6 +29,10 @@ func (e mojeekEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	if q.Page > 1 {
 		v.Set("s", fmt.Sprintf("%d", (q.Page-1)*10+1))
 	}
+	// Mojeek: safe=1 = on, omit = off. No moderate level upstream.
+	if q.SafeSearch == query.SafeStrict || q.SafeSearch == query.SafeModerate {
+		v.Set("safe", "1")
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

@@ -60,14 +60,17 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) (Response, error)
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		v.Set("setlang", loc)
 	}
+	adlt := "off"
+	srchhpgusr := "ADLT=OFF"
 	switch q.SafeSearch {
-	case query.SafeOff:
-		v.Set("adlt", "off")
 	case query.SafeModerate:
-		v.Set("adlt", "moderate")
+		adlt = "moderate"
+		srchhpgusr = "ADLT=DEMOTE"
 	case query.SafeStrict:
-		v.Set("adlt", "strict")
+		adlt = "strict"
+		srchhpgusr = "ADLT=STRICT"
 	}
+	v.Set("adlt", adlt)
 	switch q.TimeRange {
 	case query.TimeRangeDay:
 		v.Set("filters", `ex1:"ez1"`)
@@ -81,6 +84,9 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) (Response, error)
 	if err != nil {
 		return Response{}, err
 	}
+	// Bing reads safesearch off SRCHHPGUSR cookie; the adlt URL param
+	// alone is not honoured by the result-ranking layer.
+	req.Header.Set("Cookie", "SRCHHPGUSR="+srchhpgusr)
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err

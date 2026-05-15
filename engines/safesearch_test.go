@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/JoakimCarlsson/scour/query"
@@ -27,16 +28,6 @@ func TestEngineSafeSearchForwarding(t *testing.T) {
 	specs := []spec{
 		{"bing strict", bingEngine{}, &bingURL, query.SafeStrict, "adlt", "strict", body},
 		{"bing off", bingEngine{}, &bingURL, query.SafeOff, "adlt", "off", body},
-		{
-			"brave moderate",
-			braveEngine{},
-			&braveURL,
-			query.SafeModerate,
-			"safesearch",
-			"moderate",
-			body,
-		},
-		{"brave strict", braveEngine{}, &braveURL, query.SafeStrict, "safesearch", "strict", body},
 		{"google strict", googleEngine{}, &googleURL, query.SafeStrict, "safe", "active", body},
 		{"google off", googleEngine{}, &googleURL, query.SafeOff, "safe", "off", body},
 	}
@@ -59,6 +50,40 @@ func TestEngineSafeSearchForwarding(t *testing.T) {
 			)
 			if got != sp.want {
 				t.Fatalf("%s: %s=%q, want %q", sp.name, sp.param, got, sp.want)
+			}
+		})
+	}
+}
+
+func TestBraveSafeSearchInCookie(t *testing.T) {
+	cases := []struct {
+		level query.SafeLevel
+		want  string
+	}{
+		{query.SafeOff, "safesearch=off"},
+		{query.SafeModerate, "safesearch=moderate"},
+		{query.SafeStrict, "safesearch=strict"},
+	}
+	body := `<html><body><div class="snippet" data-type="web"><a class="heading-serpresult" href="https://example.com"><span class="title">t</span></a><div class="snippet-description">s</div></div></body></html>`
+	for _, c := range cases {
+		t.Run(string(c.want), func(t *testing.T) {
+			var got string
+			srv := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					got = r.Header.Get("Cookie")
+					_, _ = w.Write([]byte(body))
+				}),
+			)
+			defer srv.Close()
+			orig := braveURL
+			braveURL = srv.URL
+			defer func() { braveURL = orig }()
+			_, _ = braveEngine{}.Search(
+				context.Background(),
+				query.Query{Terms: "x", SafeSearch: c.level},
+			)
+			if !strings.Contains(got, c.want) {
+				t.Fatalf("Cookie=%q missing %q", got, c.want)
 			}
 		})
 	}
