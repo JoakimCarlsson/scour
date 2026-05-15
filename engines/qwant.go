@@ -40,7 +40,7 @@ func (qwantEngine) Weight() float64 { return 1.0 }
 func (e qwantEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(qwantURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("count", "10")
 	if q.Page > 1 {
 		v.Set("offset", fmt.Sprintf("%d", (q.Page-1)*10))

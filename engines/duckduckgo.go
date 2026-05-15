@@ -46,7 +46,7 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) (Response, 
 		return e.searchImages(ctx, q)
 	}
 	form := url.Values{}
-	form.Set("q", q.Terms)
+	form.Set("q", q.Filters.Render(q.Terms))
 	if q.Page > 1 {
 		form.Set("s", fmt.Sprintf("%d", (q.Page-1)*30))
 		form.Set("dc", fmt.Sprintf("%d", (q.Page-1)*30+1))
@@ -180,7 +180,11 @@ func (duckduckgoEngine) searchImages(ctx context.Context, q query.Query) (Respon
 	tokenReq, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		"https://duckduckgo.com/?"+url.Values{"q": {q.Terms}, "iax": {"images"}, "ia": {"images"}}.
+		"https://duckduckgo.com/?"+url.Values{
+			"q":   {q.Filters.Render(q.Terms)},
+			"iax": {"images"},
+			"ia":  {"images"},
+		}.
 			Encode(),
 		nil,
 	)
@@ -200,7 +204,7 @@ func (duckduckgoEngine) searchImages(ctx context.Context, q query.Query) (Respon
 	v := u.Query()
 	v.Set("l", "us-en")
 	v.Set("o", "json")
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("vqd", vqd)
 	v.Set("f", ",,,")
 	v.Set("p", "1")

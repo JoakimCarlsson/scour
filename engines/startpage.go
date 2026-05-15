@@ -79,7 +79,7 @@ func (e startpageEngine) Search(ctx context.Context, q query.Query) (Response, e
 		lang = loc
 	}
 	form := url.Values{}
-	form.Set("query", q.Terms)
+	form.Set("query", q.Filters.Render(q.Terms))
 	form.Set("cat", "web")
 	form.Set("t", "device")
 	form.Set("sc", sc)

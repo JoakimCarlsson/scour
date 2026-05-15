@@ -35,7 +35,7 @@ func (yandexEngine) Weight() float64              { return 1.0 }
 func (e yandexEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(yandexURL)
 	v := u.Query()
-	v.Set("text", q.Terms)
+	v.Set("text", q.Filters.Render(q.Terms))
 	v.Set("tmpl_version", "releases")
 	v.Set("web", "1")
 	v.Set("frame", "1")

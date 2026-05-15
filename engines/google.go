@@ -50,7 +50,7 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	}
 	u, _ := url.Parse(googleURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	if q.Page > 1 {
 		v.Set("start", fmt.Sprintf("%d", (q.Page-1)*10))
 	}
@@ -263,7 +263,7 @@ var googleNewsURL = "https://news.google.com/rss/search"
 func (googleEngine) searchNews(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(googleNewsURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("hl", "en-US")
 	v.Set("gl", "US")
 	v.Set("ceid", "US:en")
