@@ -1,5 +1,30 @@
 # scour
 
+A Go reimplementation of [SearXNG](https://github.com/searxng/searxng): a metasearch engine that aggregates results from multiple upstream search engines without tracking the user.
+
+## Quick start
+
+```sh
+make build
+./scour "golang tutorials"
+```
+
+Useful flags:
+
+| Flag         | Default | Purpose                                  |
+| ------------ | ------- | ---------------------------------------- |
+| `--timeout`  | `5s`    | Per-engine HTTP timeout                  |
+| `--limit`    | `20`    | Max results printed                      |
+| `--json`     | `false` | Emit results as JSON                     |
+| `--engines`  | `""`    | Comma-separated engine allowlist         |
+
+Examples:
+
+```sh
+./scour --json "golang tutorials" | jq '.[0]'
+./scour --engines duckduckgo,bing "rust async"
+```
+
 ## Development
 
 Install required tools (golangci-lint v2, goimports, golines):
