@@ -28,6 +28,7 @@ func KeyFor(q query.Query) string {
 		q.SafeSearch.String(),
 		string(q.TimeRange),
 		strconv.Itoa(q.Page),
+		q.Filters.Canonical(),
 		strings.Join(engs, ","),
 	}, "\x00")
 	sum := sha256.Sum256([]byte(canonical))

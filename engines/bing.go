@@ -52,7 +52,7 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) (Response, error)
 	}
 	u, _ := url.Parse(bingURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("form", "QBLH")
 	if q.Page > 1 {
 		v.Set("first", fmt.Sprintf("%d", (q.Page-1)*10+1))
@@ -151,7 +151,7 @@ var bingNewsURL = "https://www.bing.com/news/search"
 func (bingEngine) searchImages(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(bingImagesURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("form", "HDRSC2")
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -212,7 +212,7 @@ func parseBingImages(body []byte) (Response, error) {
 func (bingEngine) searchNews(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(bingNewsURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("form", "QBNH")
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

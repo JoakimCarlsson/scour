@@ -91,9 +91,10 @@ func emitJSON(out *pipeline.Output, limit int) {
 		results = results[:limit]
 	}
 	payload := struct {
+		Query       query.Query   `json:"query"`
 		Results     []rank.Ranked `json:"results"`
 		Suggestions []string      `json:"suggestions,omitempty"`
-	}{Results: results, Suggestions: out.Suggestions}
+	}{Query: out.Query, Results: results, Suggestions: out.Suggestions}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(payload)

@@ -35,6 +35,14 @@ func TestKeyForDiffersOnContent(t *testing.T) {
 	}
 }
 
+func TestKeyForIncludesFilters(t *testing.T) {
+	a := query.Query{Terms: "x"}
+	b := query.Query{Terms: "x", Filters: query.Filters{Sites: []string{"reddit.com"}}}
+	if KeyFor(a) == KeyFor(b) {
+		t.Fatal("KeyFor collided across Filters")
+	}
+}
+
 func TestKeyForIncludesTimeRange(t *testing.T) {
 	a := query.Query{Terms: "news", TimeRange: query.TimeRangeDay}
 	b := query.Query{Terms: "news", TimeRange: query.TimeRangeWeek}

@@ -15,6 +15,7 @@ type Query struct {
 	SafeSearch SafeLevel
 	TimeRange  TimeRange
 	Page       int
+	Filters    Filters
 }
 
 type Preferences struct {
@@ -49,6 +50,12 @@ func Parse(raw string, prefs Preferences) (Query, error) {
 	seenEngine := map[string]struct{}{}
 
 	for t := range strings.FieldsSeq(raw) {
+		// Search operators (site:, filetype:, -term, ...) consume the
+		// token entirely - we don't want them to leak into the term
+		// list and confuse the engine's q= param.
+		if parseOperatorToken(t, &q.Filters) {
+			continue
+		}
 		switch {
 		case len(t) > 1 && t[0] == '!':
 			name := strings.ToLower(t[1:])

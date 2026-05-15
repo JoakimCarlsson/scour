@@ -47,7 +47,7 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) (Response, error
 	}
 	u, _ := url.Parse(braveURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("source", "web")
 	if q.Page > 1 {
 		v.Set("offset", fmt.Sprintf("%d", q.Page-1))
@@ -152,7 +152,7 @@ var braveNewsURL = "https://search.brave.com/news"
 func (braveEngine) searchNews(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(braveNewsURL)
 	v := u.Query()
-	v.Set("q", q.Terms)
+	v.Set("q", q.Filters.Render(q.Terms))
 	v.Set("source", "news")
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
