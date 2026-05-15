@@ -3,14 +3,15 @@ package engines
 import "testing"
 
 const startpageFixture = `<html><body>
-<section class="w-gl__result">
-  <a class="w-gl__result-title" href="https://go.dev/"><h3 class="w-gl__result-title">The Go Programming Language</h3></a>
-  <p class="w-gl__description">An open source programming language.</p>
-</section>
-<section class="w-gl__result">
-  <a class="w-gl__result-title" href="https://github.com/golang/go"><h3 class="w-gl__result-title">Go on GitHub</h3></a>
-  <p class="w-gl__description">Source tree.</p>
-</section>
+<script>
+React.createElement(UIStartpage.AppSerpWeb, {"render":{"presenter":{"regions":{"mainline":[
+  {"display_type":"web-google","results":[
+    {"title":"The Go Programming Language","description":"<b>Go</b> is open source.","clickUrl":"https://go.dev/","url":null,"displayUrl":"https://go.dev/"},
+    {"title":"Documentation - Go","description":"Get started.","clickUrl":"https://golang.org/doc/","url":null,"displayUrl":"https://golang.org/doc/"}
+  ]},
+  {"display_type":"ads","results":[{"title":"Ad","clickUrl":"https://ad.example/"}]}
+]}}},"translations":{}});
+</script>
 </body></html>`
 
 func TestParseStartpage(t *testing.T) {
@@ -23,6 +24,12 @@ func TestParseStartpage(t *testing.T) {
 	}
 	if results[0].URL != "https://go.dev/" {
 		t.Errorf("url=%q", results[0].URL)
+	}
+	if results[0].Title != "The Go Programming Language" {
+		t.Errorf("title=%q", results[0].Title)
+	}
+	if results[0].Snippet != "Go is open source." {
+		t.Errorf("snippet=%q", results[0].Snippet)
 	}
 }
 
