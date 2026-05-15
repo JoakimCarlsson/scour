@@ -14,20 +14,12 @@ import (
 	"github.com/JoakimCarlsson/scour/query"
 )
 
-// googleURL points at the /m/search endpoint: Google's mobile no-JS SERP.
-// The desktop endpoint now serves a JS-required wall, but /m/search still
-// renders organic results as plain HTML when paired with a mobile UA and
-// a CONSENT=YES+ cookie. Live tests verified on 2026-05-15.
-var googleURL = "https://www.google.com/m/search"
+// googleURL is the canonical desktop SERP. The Google Search App UA pool
+// gives a class of requests Google's anti-bot treats as first-class.
+var googleURL = "https://www.google.com/search"
 
-// googleConsentCookie short-circuits Google's consent interstitial. The
-// 'YES+cb' form is what SearXNG uses (engines/google.py) and what an
-// already-accepted real session settles on.
-const googleConsentCookie = "CONSENT=YES+cb"
-
-// googleMobileUA is a real Android Chrome UA. Google's mobile SERP only
-// serves no-JS HTML when the UA looks like a mobile browser.
-const googleMobileUA = "Mozilla/5.0 (Linux; Android 11; SM-S901U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.88 Mobile Safari/537.36"
+// googleConsentCookie short-circuits Google's consent interstitial.
+const googleConsentCookie = "CONSENT=YES+"
 
 type googleEngine struct{}
 
@@ -70,6 +62,7 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	v.Set("gl", "us")
 	v.Set("pws", "0")
 	v.Set("num", "20")
+	v.Set("filter", "0")
 	switch q.SafeSearch {
 	case query.SafeOff:
 		v.Set("safe", "off")
@@ -92,7 +85,9 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 		return Response{}, err
 	}
 	req.Header.Set("Cookie", googleConsentCookie)
-	req.Header.Set("User-Agent", googleMobileUA)
+	if ua := gsaUserAgent(); ua != "" {
+		req.Header.Set("User-Agent", ua)
+	}
 	req.Header.Set("Accept", "*/*")
 	body, err := fetch(req)
 	if err != nil {
@@ -100,6 +95,9 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	}
 	if isGoogleConsent(body) {
 		return Response{}, fmt.Errorf("google: served consent page")
+	}
+	if isGoogleSorry(body) {
+		return Response{}, fmt.Errorf("google: served sorry/CAPTCHA page")
 	}
 	results, err := parseGoogle(body)
 	if err != nil {
@@ -125,43 +123,98 @@ func unwrapGoogleRedirect(href string) string {
 	return href
 }
 
+// isGoogleConsent matches the consent interstitial Google still serves to
+// some clients even with CONSENT=YES+. Distinct from the sorry/CAPTCHA
+// page handled below.
 func isGoogleConsent(body []byte) bool {
 	return bytes.Contains(body, []byte(`id="consent-bump"`)) ||
-		bytes.Contains(body, []byte(`action="https://consent.google.com/save"`)) ||
-		bytes.Contains(body, []byte(`consent.google.com`))
+		bytes.Contains(body, []byte(`action="https://consent.google.com/save"`))
 }
 
-// googleSelectors lists result-container selectors in preference order;
-// Google rotates these so we try several and stop at the first that yields
-// a non-empty result set. Gx5Zad is the mobile /m/search container we
-// target first; the desktop ones remain as a fallback in case the mobile
-// SERP layout shifts.
-var googleSelectors = []string{
-	"div.Gx5Zad",
-	"div.g",
-	"div.MjjYud",
-	"div[jscontroller][data-hveid]",
-	"div.tF2Cxc",
+// isGoogleSorry matches the CAPTCHA / sorry page. Anything <2KB containing
+// '/sorry/' counts; full pages are matched on host markers.
+func isGoogleSorry(body []byte) bool {
+	if len(body) < 2000 && bytes.Contains(body, []byte("/sorry/")) {
+		return true
+	}
+	return bytes.Contains(body, []byte("sorry.google.com"))
 }
 
 func parseGoogle(body []byte) ([]Result, error) {
 	if isGoogleConsent(body) {
 		return nil, fmt.Errorf("google: served consent page")
 	}
+	if isGoogleSorry(body) {
+		return nil, fmt.Errorf("google: served sorry/CAPTCHA page")
+	}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	for _, sel := range googleSelectors {
-		results := extractGoogleResults(doc, sel)
-		if len(results) > 0 {
-			return results, nil
+	// Primary path: anchors that carry a data-ved attribute and no class
+	// are Google's organic result links. Title is the nested div[style]
+	// inside the anchor; URL is /url?q=<dest>&sa=U which we unwrap.
+	if r := extractGoogleDataVed(doc); len(r) > 0 {
+		return r, nil
+	}
+	// Fallback for older / classic layouts that group results in known
+	// container divs.
+	for _, sel := range []string{
+		"div.g", "div.MjjYud", "div[jscontroller][data-hveid]", "div.tF2Cxc", "div.Gx5Zad",
+	} {
+		if r := extractGoogleContainer(doc, sel); len(r) > 0 {
+			return r, nil
 		}
 	}
 	return nil, fmt.Errorf("google: no results parsed")
 }
 
-func extractGoogleResults(doc *goquery.Document, sel string) []Result {
+func extractGoogleDataVed(doc *goquery.Document) []Result {
+	var results []Result
+	pos := 0
+	seen := map[string]struct{}{}
+	doc.Find("a[data-ved]").Each(func(_ int, a *goquery.Selection) {
+		if cls, has := a.Attr("class"); has && cls != "" {
+			return
+		}
+		href, _ := a.Attr("href")
+		real := unwrapGoogleRedirect(href)
+		if !strings.HasPrefix(real, "http") ||
+			strings.HasPrefix(real, "https://webcache.googleusercontent.com") ||
+			strings.Contains(real, "google.com/search") ||
+			strings.Contains(real, "support.google.com") ||
+			strings.Contains(real, "accounts.google.com") {
+			return
+		}
+		if _, dup := seen[real]; dup {
+			return
+		}
+		title := strings.TrimSpace(a.Find("div[style]").First().Text())
+		if title == "" {
+			title = strings.TrimSpace(a.Find("h3").First().Text())
+		}
+		if title == "" {
+			return
+		}
+		snippet := strings.TrimSpace(
+			a.Parent().Parent().
+				Find("div.ilUpNd, div[data-sncf], div.VwiC3b, div.s3v9rd").
+				First().Text(),
+		)
+		seen[real] = struct{}{}
+		pos++
+		results = append(results, Result{
+			Title:    title,
+			URL:      real,
+			Snippet:  snippet,
+			Engine:   "google",
+			Position: pos,
+		})
+	})
+	return results
+}
+
+func extractGoogleContainer(doc *goquery.Document, sel string) []Result {
 	var results []Result
 	pos := 0
 	seen := map[string]struct{}{}

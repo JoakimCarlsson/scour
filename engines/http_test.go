@@ -10,6 +10,24 @@ import (
 	"testing"
 )
 
+func TestGSAUserAgentRotatesWithSuffix(t *testing.T) {
+	if len(gsaUserAgents) < 2 {
+		t.Fatalf("gsa pool too small: %d", len(gsaUserAgents))
+	}
+	seen := map[string]struct{}{}
+	for range 200 {
+		ua := gsaUserAgent()
+		if !strings.HasSuffix(ua, " NSTNWV") {
+			t.Fatalf("expected NSTNWV suffix, got %q", ua)
+		}
+		seen[ua] = struct{}{}
+		if len(seen) > 1 {
+			return
+		}
+	}
+	t.Fatalf("gsaUserAgent never rotated across 200 calls: %v", seen)
+}
+
 func TestRandomUserAgentRotates(t *testing.T) {
 	if len(userAgents) < 2 {
 		t.Fatalf("pool too small: %d", len(userAgents))

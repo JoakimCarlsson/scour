@@ -16,7 +16,11 @@ import (
 //go:embed data/useragents.txt
 var userAgentsData string
 
+//go:embed data/gsa_useragents.txt
+var gsaUserAgentsData string
+
 var userAgents = loadUserAgents(userAgentsData)
+var gsaUserAgents = loadUserAgents(gsaUserAgentsData)
 
 func loadUserAgents(raw string) []string {
 	var out []string
@@ -39,6 +43,16 @@ func randomUserAgent() string {
 		return ""
 	}
 	return userAgents[rand.IntN(len(userAgents))]
+}
+
+// gsaUserAgent returns a random Android-Chrome UA from the GSA pool with
+// the " NSTNWV" suffix that the Google Search App for Android sends.
+// Used by the Google engine so each request looks like a fresh GSA client.
+func gsaUserAgent() string {
+	if len(gsaUserAgents) == 0 {
+		return ""
+	}
+	return gsaUserAgents[rand.IntN(len(gsaUserAgents))] + " NSTNWV"
 }
 
 // httpClient is shared by every engine and forces HTTP/2 ALPN when the
