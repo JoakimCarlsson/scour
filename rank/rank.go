@@ -9,6 +9,7 @@ import (
 type Ranked struct {
 	merge.Merged
 	Score float64
+	Flags []string
 }
 
 func Rank(in []merge.Merged, weights map[string]float64) []Ranked {
