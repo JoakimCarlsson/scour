@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ func KeyFor(q query.Query) string {
 		strings.ToLower(q.Language),
 		q.SafeSearch.String(),
 		string(q.TimeRange),
+		strconv.Itoa(q.Page),
 		strings.Join(engs, ","),
 	}, "\x00")
 	sum := sha256.Sum256([]byte(canonical))

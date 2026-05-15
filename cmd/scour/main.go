@@ -24,6 +24,7 @@ func main() {
 	enginesCSV := flag.String("engines", "", "comma-separated engine allowlist")
 	safeSearch := flag.String("safesearch", "moderate", "safesearch level: off|moderate|strict")
 	timeRange := flag.String("timerange", "", "time range: day|week|month|year (default: any)")
+	pages := flag.Int("pages", 1, "number of pages per engine to request")
 	flag.Parse()
 
 	raw := strings.TrimSpace(strings.Join(flag.Args(), " "))
@@ -57,6 +58,7 @@ func main() {
 			DefaultTimeRange:  tr,
 		},
 		Timeout: *timeout,
+		Pages:   *pages,
 	}
 	if *enginesCSV != "" {
 		for e := range strings.SplitSeq(*enginesCSV, ",") {

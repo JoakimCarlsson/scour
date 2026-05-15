@@ -48,6 +48,9 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) ([]Result, error
 	v := u.Query()
 	v.Set("q", q.Terms)
 	v.Set("source", "web")
+	if q.Page > 1 {
+		v.Set("offset", fmt.Sprintf("%d", q.Page-1))
+	}
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		v.Set("country", loc)
 	}

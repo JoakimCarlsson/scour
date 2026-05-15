@@ -20,6 +20,7 @@ type Preferences struct {
 	EnginesAllow    []string
 	Timeout         time.Duration
 	CacheTTL        time.Duration
+	Pages           int
 }
 
 type Pipeline struct {
@@ -64,7 +65,13 @@ func (p *Pipeline) Search(ctx context.Context, raw string, prefs Preferences) (*
 		q.Engines = prefs.EnginesAllow
 	}
 	out := &Output{Query: q}
-	key := cache.KeyFor(q)
+	pagesForKey := prefs.Pages
+	if pagesForKey < 1 {
+		pagesForKey = 1
+	}
+	keyQ := q
+	keyQ.Page = pagesForKey
+	key := cache.KeyFor(keyQ)
 	if p.Cache != nil {
 		if cached, ok := p.Cache.Get(key); ok {
 			out.Ranked = cached
@@ -76,7 +83,24 @@ func (p *Pipeline) Search(ctx context.Context, raw string, prefs Preferences) (*
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
-	results, errs := p.FanOut(ctx, q, engs, timeout)
+	pages := prefs.Pages
+	if pages < 1 {
+		pages = 1
+	}
+	var results []engines.Result
+	var errs []engines.FanOutError
+	enginePos := map[string]int{}
+	for page := 1; page <= pages; page++ {
+		pq := q
+		pq.Page = page
+		pageResults, pageErrs := p.FanOut(ctx, pq, engs, timeout)
+		errs = append(errs, pageErrs...)
+		for _, r := range pageResults {
+			enginePos[r.Engine]++
+			r.Position = enginePos[r.Engine]
+			results = append(results, r)
+		}
+	}
 	out.Errors = errs
 	merged := merge.Merge(results)
 	ranked := rank.Rank(merged, prefs.EngineWeights)

@@ -48,6 +48,9 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error)
 	v := u.Query()
 	v.Set("q", q.Terms)
 	v.Set("form", "QBLH")
+	if q.Page > 1 {
+		v.Set("first", fmt.Sprintf("%d", (q.Page-1)*10+1))
+	}
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		v.Set("setlang", loc)
 	}

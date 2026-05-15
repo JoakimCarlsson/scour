@@ -48,6 +48,9 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, erro
 	u, _ := url.Parse(googleURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
+	if q.Page > 1 {
+		v.Set("start", fmt.Sprintf("%d", (q.Page-1)*10))
+	}
 	hl := "en"
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		hl = loc

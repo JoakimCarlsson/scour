@@ -14,6 +14,7 @@ type Query struct {
 	Engines    []string
 	SafeSearch SafeLevel
 	TimeRange  TimeRange
+	Page       int
 }
 
 type Preferences struct {
@@ -40,6 +41,7 @@ func Parse(raw string, prefs Preferences) (Query, error) {
 		Language:   prefs.DefaultLanguage,
 		SafeSearch: prefs.DefaultSafeSearch,
 		TimeRange:  prefs.DefaultTimeRange,
+		Page:       1,
 	}
 
 	var terms []string

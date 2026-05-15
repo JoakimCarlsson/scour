@@ -46,6 +46,10 @@ func (duckduckgoEngine) Weight() float64 { return 1.0 }
 func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
 	form := url.Values{}
 	form.Set("q", q.Terms)
+	if q.Page > 1 {
+		form.Set("s", fmt.Sprintf("%d", (q.Page-1)*30))
+		form.Set("dc", fmt.Sprintf("%d", (q.Page-1)*30+1))
+	}
 	kl := "us-en"
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		kl = loc
