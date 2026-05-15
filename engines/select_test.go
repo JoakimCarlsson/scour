@@ -45,7 +45,17 @@ func TestSelect(t *testing.T) {
 		{
 			name: "default general query returns all engines alphabetically",
 			q:    query.Query{Category: query.CategoryGeneral, Language: "en"},
-			want: []string{"bing", "brave", "duckduckgo", "google"},
+			want: []string{
+				"bing",
+				"brave",
+				"duckduckgo",
+				"google",
+				"mojeek",
+				"qwant",
+				"searx_public",
+				"startpage",
+				"yandex",
+			},
 		},
 		{
 			name: "bang pin restricts to google",
@@ -56,7 +66,16 @@ func TestSelect(t *testing.T) {
 			name:  "disabled engine is excluded",
 			q:     query.Query{Category: query.CategoryGeneral},
 			prefs: Preferences{DisabledEngines: []string{"bing"}},
-			want:  []string{"brave", "duckduckgo", "google"},
+			want: []string{
+				"brave",
+				"duckduckgo",
+				"google",
+				"mojeek",
+				"qwant",
+				"searx_public",
+				"startpage",
+				"yandex",
+			},
 		},
 		{
 			name:  "disabled wins over pinned",
@@ -65,7 +84,7 @@ func TestSelect(t *testing.T) {
 			want:  nil,
 		},
 		{
-			name: "images category returns all engines",
+			name: "images category returns image-capable engines",
 			q:    query.Query{Category: query.CategoryImages},
 			want: []string{"bing", "brave", "duckduckgo", "google"},
 		},
@@ -82,12 +101,32 @@ func TestSelect(t *testing.T) {
 		{
 			name: "wildcard language engines match any language",
 			q:    query.Query{Category: query.CategoryGeneral, Language: "ja"},
-			want: []string{"bing", "brave", "duckduckgo", "google"},
+			want: []string{
+				"bing",
+				"brave",
+				"duckduckgo",
+				"google",
+				"mojeek",
+				"qwant",
+				"searx_public",
+				"startpage",
+				"yandex",
+			},
 		},
 		{
 			name: "empty language treated as no constraint",
 			q:    query.Query{Category: query.CategoryGeneral},
-			want: []string{"bing", "brave", "duckduckgo", "google"},
+			want: []string{
+				"bing",
+				"brave",
+				"duckduckgo",
+				"google",
+				"mojeek",
+				"qwant",
+				"searx_public",
+				"startpage",
+				"yandex",
+			},
 		},
 	}
 
