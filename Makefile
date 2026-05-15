@@ -26,7 +26,11 @@ fmt:
 fmt-check:
 	@out=`gofmt -s -l . | grep -v '^vendor/' || true`; \
 	if [ -n "$$out" ]; then \
-		echo "Files need formatting:"; echo "$$out"; exit 1; \
+		echo "Files need gofmt:"; echo "$$out"; exit 1; \
+	fi
+	@out=`$(GOPATH_BIN)/golines -m 100 --ignored-dirs=vendor -l . || true`; \
+	if [ -n "$$out" ]; then \
+		echo "Files need golines:"; echo "$$out"; exit 1; \
 	fi
 
 vet:
