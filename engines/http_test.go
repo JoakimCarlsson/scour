@@ -71,6 +71,118 @@ func TestFetchRotatesUAByDefault(t *testing.T) {
 	}
 }
 
+func TestChromeClientHintsForUA(t *testing.T) {
+	cases := []struct {
+		ua            string
+		wantOK        bool
+		wantPlatform  string
+		wantMobile    string
+		wantBrandHint string
+	}{
+		{
+			ua:            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+			wantOK:        true,
+			wantPlatform:  `"Windows"`,
+			wantMobile:    "?0",
+			wantBrandHint: `"Chromium";v="131"`,
+		},
+		{
+			ua:            "Mozilla/5.0 (Linux; Android 14; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.81 Mobile Safari/537.36",
+			wantOK:        true,
+			wantPlatform:  `"Android"`,
+			wantMobile:    "?1",
+			wantBrandHint: `"Chromium";v="131"`,
+		},
+		{
+			ua:            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+			wantOK:        true,
+			wantPlatform:  `"macOS"`,
+			wantMobile:    "?0",
+			wantBrandHint: `"Microsoft Edge";v="130"`,
+		},
+		{
+			ua:     "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
+			wantOK: false,
+		},
+		{
+			ua:     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+			wantOK: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.ua[:30], func(t *testing.T) {
+			chua, mobile, platform, ok := chromeClientHintsForUA(c.ua)
+			if ok != c.wantOK {
+				t.Fatalf("ok=%v want %v", ok, c.wantOK)
+			}
+			if !c.wantOK {
+				return
+			}
+			if platform != c.wantPlatform {
+				t.Errorf("platform=%q want %q", platform, c.wantPlatform)
+			}
+			if mobile != c.wantMobile {
+				t.Errorf("mobile=%q want %q", mobile, c.wantMobile)
+			}
+			if !strings.Contains(chua, c.wantBrandHint) {
+				t.Errorf("chua=%q missing %q", chua, c.wantBrandHint)
+			}
+		})
+	}
+}
+
+func TestFetchSendsClientHintsForChromiumUA(t *testing.T) {
+	var ua, chua, plat, mob, fetchSite string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		ua = r.Header.Get("User-Agent")
+		chua = r.Header.Get("Sec-CH-UA")
+		plat = r.Header.Get("Sec-CH-UA-Platform")
+		mob = r.Header.Get("Sec-CH-UA-Mobile")
+		fetchSite = r.Header.Get("Sec-Fetch-Site")
+	}))
+	defer srv.Close()
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req.Header.Set(
+		"User-Agent",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	)
+	_, _ = fetch(req)
+	if !strings.Contains(chua, `"Chromium";v="131"`) {
+		t.Errorf("Sec-CH-UA=%q (UA=%q)", chua, ua)
+	}
+	if plat != `"Windows"` {
+		t.Errorf("Sec-CH-UA-Platform=%q", plat)
+	}
+	if mob != "?0" {
+		t.Errorf("Sec-CH-UA-Mobile=%q", mob)
+	}
+	if fetchSite != "none" {
+		t.Errorf("Sec-Fetch-Site=%q", fetchSite)
+	}
+}
+
+func TestFetchSkipsClientHintsForFirefox(t *testing.T) {
+	var chua, fetchSite string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		chua = r.Header.Get("Sec-CH-UA")
+		fetchSite = r.Header.Get("Sec-Fetch-Site")
+	}))
+	defer srv.Close()
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL, nil)
+	req.Header.Set(
+		"User-Agent",
+		"Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
+	)
+	_, _ = fetch(req)
+	if chua != "" {
+		t.Errorf("Sec-CH-UA should be empty for Firefox, got %q", chua)
+	}
+	// Sec-Fetch-* are sent by all modern browsers including Firefox.
+	if fetchSite != "none" {
+		t.Errorf("Sec-Fetch-Site=%q", fetchSite)
+	}
+}
+
 func TestFetchHonorsPresetUA(t *testing.T) {
 	var got string
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {

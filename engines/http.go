@@ -224,6 +224,8 @@ func fetchWithHeaders(req *http.Request) (*http.Response, []byte, error) {
 	if req.Header.Get("Accept-Language") == "" {
 		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 	}
+	applyChromeClientHints(req)
+	applySecFetchDefaults(req)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, nil, err
@@ -245,4 +247,89 @@ type httpError struct {
 
 func (e *httpError) Error() string {
 	return http.StatusText(e.Status)
+}
+
+// applyChromeClientHints sets Sec-CH-UA / Sec-CH-UA-Mobile /
+// Sec-CH-UA-Platform derived from the request's User-Agent so the
+// hints align with the UA string (real Chrome doesn't randomize them
+// independently of the UA - mismatch is itself a bot signal). Skipped
+// for non-Chromium UAs (Firefox, Safari) which don't send Sec-CH-UA at
+// all in real browsers. Skipped if the caller already set Sec-CH-UA.
+func applyChromeClientHints(req *http.Request) {
+	if req.Header.Get("Sec-CH-UA") != "" {
+		return
+	}
+	chua, mobile, platform, ok := chromeClientHintsForUA(req.Header.Get("User-Agent"))
+	if !ok {
+		return
+	}
+	req.Header.Set("Sec-CH-UA", chua)
+	req.Header.Set("Sec-CH-UA-Mobile", mobile)
+	req.Header.Set("Sec-CH-UA-Platform", platform)
+}
+
+// chromeClientHintsForUA parses a UA string and returns the trio of
+// Sec-CH-UA values a real Chrome with that UA would send. Returns
+// ok=false for non-Chromium browsers (Firefox, Safari).
+func chromeClientHintsForUA(ua string) (chua, mobile, platform string, ok bool) {
+	if ua == "" || strings.Contains(ua, "Firefox/") {
+		return "", "", "", false
+	}
+	idx := strings.Index(ua, "Chrome/")
+	if idx < 0 {
+		return "", "", "", false
+	}
+	rest := ua[idx+len("Chrome/"):]
+	end := strings.IndexAny(rest, ". ")
+	if end < 0 {
+		return "", "", "", false
+	}
+	major := rest[:end]
+	if major == "" {
+		return "", "", "", false
+	}
+
+	switch {
+	case strings.Contains(ua, "Windows NT"):
+		platform = `"Windows"`
+	case strings.Contains(ua, "Macintosh"):
+		platform = `"macOS"`
+	case strings.Contains(ua, "Android"):
+		platform = `"Android"`
+	case strings.Contains(ua, "X11; Linux"), strings.Contains(ua, "X11; Ubuntu"):
+		platform = `"Linux"`
+	default:
+		platform = `"Unknown"`
+	}
+
+	mobile = "?0"
+	if strings.Contains(ua, "Mobile") || strings.Contains(ua, "Android") {
+		mobile = "?1"
+	}
+
+	brand := "Google Chrome"
+	if strings.Contains(ua, "Edg/") {
+		brand = "Microsoft Edge"
+	}
+	chua = fmt.Sprintf(
+		`"Chromium";v="%s", "Not_A Brand";v="24", "%s";v="%s"`,
+		major,
+		brand,
+		major,
+	)
+	return chua, mobile, platform, true
+}
+
+// applySecFetchDefaults sets the standard navigation Sec-Fetch-* trio
+// (none/document/navigate/?1) when the caller hasn't already chosen
+// values. Engines like DuckDuckGo that send a same-origin POST set
+// their own Sec-Fetch-Site=same-origin, etc., before calling fetch().
+func applySecFetchDefaults(req *http.Request) {
+	if req.Header.Get("Sec-Fetch-Site") != "" {
+		return
+	}
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
 }
