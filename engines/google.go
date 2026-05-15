@@ -19,13 +19,7 @@ type googleEngine struct{}
 
 func (googleEngine) Name() string { return "google" }
 func (googleEngine) Categories() []query.Category {
-	return []query.Category{
-		query.CategoryGeneral,
-		query.CategoryNews,
-		query.CategoryImages,
-		query.CategoryVideos,
-		query.CategoryMap,
-	}
+	return []query.Category{query.CategoryGeneral}
 }
 func (googleEngine) Languages() LanguageTraits {
 	return LanguageTraits{

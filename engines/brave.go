@@ -22,8 +22,6 @@ func (braveEngine) Categories() []query.Category {
 	return []query.Category{
 		query.CategoryGeneral,
 		query.CategoryNews,
-		query.CategoryImages,
-		query.CategoryVideos,
 	}
 }
 func (braveEngine) Languages() LanguageTraits {
@@ -44,6 +42,9 @@ func (braveEngine) Languages() LanguageTraits {
 func (braveEngine) Weight() float64 { return 1.0 }
 
 func (e braveEngine) Search(ctx context.Context, q query.Query) (Response, error) {
+	if q.Category == query.CategoryNews {
+		return e.searchNews(ctx, q)
+	}
 	u, _ := url.Parse(braveURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
@@ -144,6 +145,67 @@ func parseBrave(body []byte) ([]Result, error) {
 		return nil, fmt.Errorf("brave: no results parsed")
 	}
 	return results, nil
+}
+
+var braveNewsURL = "https://search.brave.com/news"
+
+func (braveEngine) searchNews(ctx context.Context, q query.Query) (Response, error) {
+	u, _ := url.Parse(braveNewsURL)
+	v := u.Query()
+	v.Set("q", q.Terms)
+	v.Set("source", "news")
+	u.RawQuery = v.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return Response{}, err
+	}
+	body, err := fetch(req)
+	if err != nil {
+		return Response{}, err
+	}
+	return parseBraveNews(body)
+}
+
+func parseBraveNews(body []byte) (Response, error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return Response{}, err
+	}
+	var results []Result
+	pos := 0
+	doc.Find("div.snippet[data-type='news'], div[data-type='news']").
+		Each(func(_ int, s *goquery.Selection) {
+			linkEl := s.Find("a[href]").First()
+			href, _ := linkEl.Attr("href")
+			title := strings.TrimSpace(s.Find(".title, h3").First().Text())
+			if title == "" {
+				title = strings.TrimSpace(linkEl.Text())
+			}
+			snippet := strings.TrimSpace(
+				s.Find(".snippet-description, .description").First().Text(),
+			)
+			published := strings.TrimSpace(s.Find("time, .time, .date").First().Text())
+			if title == "" || href == "" {
+				return
+			}
+			pos++
+			extras := map[string]string{}
+			if published != "" {
+				extras[ExtraPublishedAt] = published
+			}
+			results = append(results, Result{
+				Title:    title,
+				URL:      href,
+				Snippet:  snippet,
+				Engine:   "brave",
+				Position: pos,
+				Extras:   extras,
+			})
+		})
+	if len(results) == 0 {
+		return Response{}, fmt.Errorf("brave: no news results parsed")
+	}
+	return Response{Results: results}, nil
 }
 
 func init() {

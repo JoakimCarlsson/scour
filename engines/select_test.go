@@ -86,12 +86,17 @@ func TestSelect(t *testing.T) {
 		{
 			name: "images category returns image-capable engines",
 			q:    query.Query{Category: query.CategoryImages},
-			want: []string{"bing", "brave", "duckduckgo", "google"},
+			want: []string{"bing", "duckduckgo"},
 		},
 		{
-			name: "map category returns only google",
+			name: "news category returns news-capable engines",
+			q:    query.Query{Category: query.CategoryNews},
+			want: []string{"bing", "brave", "qwant"},
+		},
+		{
+			name: "map category returns nothing",
 			q:    query.Query{Category: query.CategoryMap},
-			want: []string{"google"},
+			want: nil,
 		},
 		{
 			name: "music category returns empty slice",

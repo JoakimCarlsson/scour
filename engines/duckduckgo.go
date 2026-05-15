@@ -22,12 +22,7 @@ type duckduckgoEngine struct{}
 
 func (duckduckgoEngine) Name() string { return "duckduckgo" }
 func (duckduckgoEngine) Categories() []query.Category {
-	return []query.Category{
-		query.CategoryGeneral,
-		query.CategoryNews,
-		query.CategoryImages,
-		query.CategoryVideos,
-	}
+	return []query.Category{query.CategoryGeneral, query.CategoryImages}
 }
 func (duckduckgoEngine) Languages() LanguageTraits {
 	return LanguageTraits{
