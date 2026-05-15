@@ -84,6 +84,11 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) (Response, 
 		return Response{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Referer", "https://html.duckduckgo.com/")
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err
@@ -102,7 +107,7 @@ func parseDuckDuckGoSuggestions(body []byte) []string {
 	}
 	var sugs []string
 	seen := map[string]struct{}{}
-	doc.Find("div.zci__suggestion, div.zci__suggestions a, a.js-spelling-suggestion-link").
+	doc.Find("div.msg--spelling a, div.zci__suggestion, div.zci__suggestions a, a.js-spelling-suggestion-link").
 		Each(func(_ int, s *goquery.Selection) {
 			t := strings.TrimSpace(s.Text())
 			if t == "" {

@@ -99,18 +99,19 @@ func parseBingSuggestions(body []byte) []string {
 	}
 	var sugs []string
 	seen := map[string]struct{}{}
-	doc.Find("a.sa_qs, a.sa_tup").Each(func(_ int, s *goquery.Selection) {
-		t := strings.TrimSpace(s.Text())
-		if t == "" {
-			return
-		}
-		k := strings.ToLower(t)
-		if _, dup := seen[k]; dup {
-			return
-		}
-		seen[k] = struct{}{}
-		sugs = append(sugs, t)
-	})
+	doc.Find("div.sp_requery a, a.sc_qs, a.sa_qs, a.sa_tup").
+		Each(func(_ int, s *goquery.Selection) {
+			t := strings.TrimSpace(s.Text())
+			if t == "" {
+				return
+			}
+			k := strings.ToLower(t)
+			if _, dup := seen[k]; dup {
+				return
+			}
+			seen[k] = struct{}{}
+			sugs = append(sugs, t)
+		})
 	return sugs
 }
 
