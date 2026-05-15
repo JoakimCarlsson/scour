@@ -54,14 +54,14 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	if q.Page > 1 {
 		v.Set("start", fmt.Sprintf("%d", (q.Page-1)*10))
 	}
-	hl := "en"
+	hl := "en-US"
 	if loc, ok := e.Languages().Native(q.Language); ok {
 		hl = loc
 	}
 	v.Set("hl", hl)
-	v.Set("gl", "us")
-	v.Set("pws", "0")
-	v.Set("num", "20")
+	v.Set("lr", "lang_en")
+	v.Set("ie", "utf8")
+	v.Set("oe", "utf8")
 	v.Set("filter", "0")
 	switch q.SafeSearch {
 	case query.SafeOff:
