@@ -1,25 +1,78 @@
 package engines
 
 import (
+	"bufio"
+	"crypto/tls"
+	_ "embed"
 	"io"
+	"math/rand/v2"
 	"net/http"
+	"strings"
+	"time"
+
+	"golang.org/x/net/http2"
 )
 
-const userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+//go:embed data/useragents.txt
+var userAgentsData string
 
-var httpClient = &http.Client{
-	Timeout: 0,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return http.ErrUseLastResponse
+var userAgents = loadUserAgents(userAgentsData)
+
+func loadUserAgents(raw string) []string {
+	var out []string
+	sc := bufio.NewScanner(strings.NewReader(raw))
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
-		return nil
-	},
+		out = append(out, line)
+	}
+	return out
 }
+
+// randomUserAgent returns a real-browser UA chosen at random from the
+// embedded pool. Returns the empty string if the pool failed to load
+// (callers in that case fall back to whatever they explicitly set).
+func randomUserAgent() string {
+	if len(userAgents) == 0 {
+		return ""
+	}
+	return userAgents[rand.IntN(len(userAgents))]
+}
+
+// httpClient is shared by every engine and forces HTTP/2 ALPN when the
+// server supports it. Plain http.DefaultTransport also negotiates h2,
+// but constructing the Transport explicitly lets us pin TLS / proxy
+// settings and gives the h2 wire test something deterministic to assert.
+var httpClient = func() *http.Client {
+	t := &http.Transport{
+		ForceAttemptHTTP2:   true,
+		MaxIdleConns:        100,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     &tls.Config{NextProtos: []string{"h2", "http/1.1"}},
+	}
+	// Explicitly register the HTTP/2 transport so ForceAttemptHTTP2 has a
+	// matching protocol handler. Without this, a custom Transport
+	// negotiates ALPN but falls back to HTTP/1.1 anyway.
+	_ = http2.ConfigureTransport(t)
+	return &http.Client{
+		Transport: t,
+		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+}()
 
 func fetch(req *http.Request) ([]byte, error) {
 	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", userAgent)
+		if ua := randomUserAgent(); ua != "" {
+			req.Header.Set("User-Agent", ua)
+		}
 	}
 	if req.Header.Get("Accept-Language") == "" {
 		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
