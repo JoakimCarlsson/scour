@@ -22,12 +22,23 @@ func FanOut(
 	engs []Engine,
 	timeout time.Duration,
 ) ([]Result, []FanOutError) {
+	all, _, errs := FanOutResponse(ctx, q, engs, timeout)
+	return all, errs
+}
+
+func FanOutResponse(
+	ctx context.Context,
+	q query.Query,
+	engs []Engine,
+	timeout time.Duration,
+) ([]Result, []string, []FanOutError) {
 	if len(engs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	type outcome struct {
-		results []Result
-		err     *FanOutError
+		results     []Result
+		suggestions []string
+		err         *FanOutError
 	}
 	ch := make(chan outcome, len(engs))
 	var wg sync.WaitGroup
@@ -37,17 +48,18 @@ func FanOut(
 			defer wg.Done()
 			eCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
-			res, err := e.Search(eCtx, q)
+			resp, err := e.Search(eCtx, q)
 			if err != nil {
 				ch <- outcome{err: &FanOutError{Engine: e.Name(), Err: err}}
 				return
 			}
-			ch <- outcome{results: res}
+			ch <- outcome{results: resp.Results, suggestions: resp.Suggestions}
 		}(e)
 	}
 	wg.Wait()
 	close(ch)
 	var all []Result
+	var sugs []string
 	var errs []FanOutError
 	for o := range ch {
 		if o.err != nil {
@@ -55,6 +67,7 @@ func FanOut(
 			continue
 		}
 		all = append(all, o.results...)
+		sugs = append(sugs, o.suggestions...)
 	}
-	return all, errs
+	return all, sugs, errs
 }

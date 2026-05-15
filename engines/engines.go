@@ -41,12 +41,17 @@ func (t LanguageTraits) Native(bcp47 string) (string, bool) {
 	return v, ok
 }
 
+type Response struct {
+	Results     []Result
+	Suggestions []string
+}
+
 type Engine interface {
 	Name() string
 	Categories() []query.Category
 	Languages() LanguageTraits
 	Weight() float64
-	Search(ctx context.Context, q query.Query) ([]Result, error)
+	Search(ctx context.Context, q query.Query) (Response, error)
 }
 
 type Preferences struct {

@@ -44,7 +44,7 @@ func (googleEngine) Languages() LanguageTraits {
 }
 func (googleEngine) Weight() float64 { return 1.0 }
 
-func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
+func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(googleURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
@@ -76,13 +76,17 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, erro
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	body, err := fetch(req)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
-	return parseGoogle(body)
+	results, err := parseGoogle(body)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{Results: results}, nil
 }
 
 func parseGoogle(body []byte) ([]Result, error) {

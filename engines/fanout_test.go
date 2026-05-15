@@ -18,16 +18,16 @@ type fakeEngine struct {
 	calls   *int32
 }
 
-func (f fakeEngine) Search(ctx context.Context, _ query.Query) ([]Result, error) {
+func (f fakeEngine) Search(ctx context.Context, _ query.Query) (Response, error) {
 	if f.calls != nil {
 		atomic.AddInt32(f.calls, 1)
 	}
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return Response{}, ctx.Err()
 	case <-time.After(f.delay):
 	}
-	return f.results, f.err
+	return Response{Results: f.results}, f.err
 }
 
 func TestFanOutAggregatesResults(t *testing.T) {

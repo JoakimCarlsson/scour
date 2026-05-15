@@ -20,8 +20,8 @@ func (s stubEngine) Name() string                 { return s.name }
 func (s stubEngine) Categories() []query.Category { return s.categories }
 func (s stubEngine) Languages() LanguageTraits    { return s.languages }
 func (s stubEngine) Weight() float64              { return s.weight }
-func (s stubEngine) Search(_ context.Context, _ query.Query) ([]Result, error) {
-	return nil, nil
+func (s stubEngine) Search(_ context.Context, _ query.Query) (Response, error) {
+	return Response{}, nil
 }
 
 func names(es []Engine) []string {

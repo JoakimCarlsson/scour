@@ -43,7 +43,7 @@ func (braveEngine) Languages() LanguageTraits {
 }
 func (braveEngine) Weight() float64 { return 1.0 }
 
-func (e braveEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
+func (e braveEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(braveURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
@@ -75,13 +75,39 @@ func (e braveEngine) Search(ctx context.Context, q query.Query) ([]Result, error
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	body, err := fetch(req)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
-	return parseBrave(body)
+	results, err := parseBrave(body)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{Results: results, Suggestions: parseBraveSuggestions(body)}, nil
+}
+
+func parseBraveSuggestions(body []byte) []string {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return nil
+	}
+	var sugs []string
+	seen := map[string]struct{}{}
+	doc.Find("a.suggestion, a.related-searches a").Each(func(_ int, s *goquery.Selection) {
+		t := strings.TrimSpace(s.Text())
+		if t == "" {
+			return
+		}
+		k := strings.ToLower(t)
+		if _, dup := seen[k]; dup {
+			return
+		}
+		seen[k] = struct{}{}
+		sugs = append(sugs, t)
+	})
+	return sugs
 }
 
 func parseBrave(body []byte) ([]Result, error) {

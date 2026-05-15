@@ -43,7 +43,7 @@ func (duckduckgoEngine) Languages() LanguageTraits {
 }
 func (duckduckgoEngine) Weight() float64 { return 1.0 }
 
-func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
+func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	form := url.Values{}
 	form.Set("q", q.Terms)
 	if q.Page > 1 {
@@ -80,14 +80,41 @@ func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, 
 		strings.NewReader(form.Encode()),
 	)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	body, err := fetch(req)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
-	return parseDuckDuckGo(body)
+	results, err := parseDuckDuckGo(body)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{Results: results, Suggestions: parseDuckDuckGoSuggestions(body)}, nil
+}
+
+func parseDuckDuckGoSuggestions(body []byte) []string {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return nil
+	}
+	var sugs []string
+	seen := map[string]struct{}{}
+	doc.Find("div.zci__suggestion, div.zci__suggestions a, a.js-spelling-suggestion-link").
+		Each(func(_ int, s *goquery.Selection) {
+			t := strings.TrimSpace(s.Text())
+			if t == "" {
+				return
+			}
+			k := strings.ToLower(t)
+			if _, dup := seen[k]; dup {
+				return
+			}
+			seen[k] = struct{}{}
+			sugs = append(sugs, t)
+		})
+	return sugs
 }
 
 func parseDuckDuckGo(body []byte) ([]Result, error) {

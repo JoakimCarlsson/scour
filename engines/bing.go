@@ -43,7 +43,7 @@ func (bingEngine) Languages() LanguageTraits {
 }
 func (bingEngine) Weight() float64 { return 1.0 }
 
-func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
+func (e bingEngine) Search(ctx context.Context, q query.Query) (Response, error) {
 	u, _ := url.Parse(bingURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
@@ -73,13 +73,39 @@ func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error)
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	body, err := fetch(req)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
-	return parseBing(body)
+	results, err := parseBing(body)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{Results: results, Suggestions: parseBingSuggestions(body)}, nil
+}
+
+func parseBingSuggestions(body []byte) []string {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return nil
+	}
+	var sugs []string
+	seen := map[string]struct{}{}
+	doc.Find("a.sa_qs, a.sa_tup").Each(func(_ int, s *goquery.Selection) {
+		t := strings.TrimSpace(s.Text())
+		if t == "" {
+			return
+		}
+		k := strings.ToLower(t)
+		if _, dup := seen[k]; dup {
+			return
+		}
+		seen[k] = struct{}{}
+		sugs = append(sugs, t)
+	})
+	return sugs
 }
 
 func parseBing(body []byte) ([]Result, error) {

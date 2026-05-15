@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/JoakimCarlsson/scour/cache"
@@ -26,6 +28,7 @@ type Preferences struct {
 type Pipeline struct {
 	Cache       cache.Cache
 	FanOut      func(ctx context.Context, q query.Query, engs []engines.Engine, timeout time.Duration) ([]engines.Result, []engines.FanOutError)
+	FanOutResp  func(ctx context.Context, q query.Query, engs []engines.Engine, timeout time.Duration) ([]engines.Result, []string, []engines.FanOutError)
 	Select      func(q query.Query, prefs engines.Preferences) []engines.Engine
 	PluginChain func(prefs Preferences) []plugins.Plugin
 }
@@ -34,6 +37,7 @@ func New(c cache.Cache) *Pipeline {
 	return &Pipeline{
 		Cache:       c,
 		FanOut:      engines.FanOut,
+		FanOutResp:  engines.FanOutResponse,
 		Select:      engines.Select,
 		PluginChain: defaultPlugins,
 	}
@@ -49,11 +53,12 @@ func defaultPlugins(p Preferences) []plugins.Plugin {
 }
 
 type Output struct {
-	Query   query.Query
-	Ranked  []rank.Ranked
-	Infobox *plugins.Infobox
-	Answer  *plugins.Answer
-	Errors  []engines.FanOutError
+	Query       query.Query
+	Ranked      []rank.Ranked
+	Infobox     *plugins.Infobox
+	Answer      *plugins.Answer
+	Suggestions []string
+	Errors      []engines.FanOutError
 }
 
 func (p *Pipeline) Search(ctx context.Context, raw string, prefs Preferences) (*Output, error) {
@@ -89,18 +94,35 @@ func (p *Pipeline) Search(ctx context.Context, raw string, prefs Preferences) (*
 	}
 	var results []engines.Result
 	var errs []engines.FanOutError
+	sugCounts := map[string]int{}
+	sugDisplay := map[string]string{}
 	enginePos := map[string]int{}
 	for page := 1; page <= pages; page++ {
 		pq := q
 		pq.Page = page
-		pageResults, pageErrs := p.FanOut(ctx, pq, engs, timeout)
+		var pageResults []engines.Result
+		var pageSugs []string
+		var pageErrs []engines.FanOutError
+		if p.FanOutResp != nil {
+			pageResults, pageSugs, pageErrs = p.FanOutResp(ctx, pq, engs, timeout)
+		} else {
+			pageResults, pageErrs = p.FanOut(ctx, pq, engs, timeout)
+		}
 		errs = append(errs, pageErrs...)
 		for _, r := range pageResults {
 			enginePos[r.Engine]++
 			r.Position = enginePos[r.Engine]
 			results = append(results, r)
 		}
+		for _, s := range pageSugs {
+			k := strings.ToLower(s)
+			if _, ok := sugDisplay[k]; !ok {
+				sugDisplay[k] = s
+			}
+			sugCounts[k]++
+		}
 	}
+	out.Suggestions = topSuggestions(sugCounts, sugDisplay, 5)
 	out.Errors = errs
 	merged := merge.Merge(results)
 	ranked := rank.Rank(merged, prefs.EngineWeights)
@@ -119,4 +141,28 @@ func (p *Pipeline) Search(ctx context.Context, raw string, prefs Preferences) (*
 		p.Cache.Set(key, out.Ranked, ttl)
 	}
 	return out, nil
+}
+
+func topSuggestions(counts map[string]int, display map[string]string, n int) []string {
+	if len(counts) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if counts[keys[i]] != counts[keys[j]] {
+			return counts[keys[i]] > counts[keys[j]]
+		}
+		return strings.ToLower(display[keys[i]]) < strings.ToLower(display[keys[j]])
+	})
+	if len(keys) > n {
+		keys = keys[:n]
+	}
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, display[k])
+	}
+	return out
 }

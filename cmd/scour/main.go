@@ -78,19 +78,24 @@ func main() {
 	}
 
 	if *jsonOut {
-		emitJSON(out.Ranked, *limit)
+		emitJSON(out, *limit)
 		return
 	}
 	emitPretty(out, *limit)
 }
 
-func emitJSON(results []rank.Ranked, limit int) {
+func emitJSON(out *pipeline.Output, limit int) {
+	results := out.Ranked
 	if limit > 0 && len(results) > limit {
 		results = results[:limit]
 	}
+	payload := struct {
+		Results     []rank.Ranked `json:"results"`
+		Suggestions []string      `json:"suggestions,omitempty"`
+	}{Results: results, Suggestions: out.Suggestions}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(results)
+	_ = enc.Encode(payload)
 }
 
 func emitPretty(out *pipeline.Output, limit int) {
@@ -125,6 +130,12 @@ func emitPretty(out *pipeline.Output, limit int) {
 		}
 		fmt.Printf("   sources: %s\n", formatSources(r))
 		fmt.Println()
+	}
+	if len(out.Suggestions) > 0 {
+		fmt.Println("Did you mean:")
+		for _, s := range out.Suggestions {
+			fmt.Printf("  - %s\n", s)
+		}
 	}
 }
 

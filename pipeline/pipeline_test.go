@@ -24,11 +24,11 @@ func (e countingEngine) Languages() engines.LanguageTraits {
 	return engines.LanguageTraits{All: true}
 }
 func (e countingEngine) Weight() float64 { return 1.0 }
-func (e countingEngine) Search(_ context.Context, _ query.Query) ([]engines.Result, error) {
+func (e countingEngine) Search(_ context.Context, _ query.Query) (engines.Response, error) {
 	atomic.AddInt32(e.calls, 1)
-	return []engines.Result{
+	return engines.Response{Results: []engines.Result{
 		{Title: "Go", URL: "https://go.dev/", Engine: e.name, Position: 1},
-	}, nil
+	}}, nil
 }
 
 func TestPipelineCacheHitSkipsEngines(t *testing.T) {
