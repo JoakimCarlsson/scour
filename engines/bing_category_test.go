@@ -21,10 +21,11 @@ func TestParseBingImages(t *testing.T) {
 
 func TestParseBingNews(t *testing.T) {
 	body := []byte(`<html><body>
-<div class="news-card">
-  <a class="title" href="https://example.com/story-1">Story 1</a>
-  <div class="snippet">A summary.</div>
-  <div class="source"><span>1 hour ago</span></div>
+<div class="news-card newsitem cardcommon" url="https://example.com/story-1" title="Story 1" data-author="Example News">
+  <div class="caption"><div class="t_s"><div class="t_t">
+    <div class="source"><a>Example News</a><span><div class="ns_sc_tm">1 hour ago</div></span></div>
+    <a class="title" href="https://example.com/story-1"><h2>Story 1</h2></a>
+  </div></div></div>
 </div>
 </body></html>`)
 	resp, err := parseBingNews(body)
@@ -36,6 +37,9 @@ func TestParseBingNews(t *testing.T) {
 	}
 	if resp.Results[0].Extras[ExtraPublishedAt] != "1 hour ago" {
 		t.Errorf("published=%q", resp.Results[0].Extras[ExtraPublishedAt])
+	}
+	if resp.Results[0].Extras[ExtraAuthor] != "Example News" {
+		t.Errorf("author=%q", resp.Results[0].Extras[ExtraAuthor])
 	}
 }
 

@@ -233,32 +233,67 @@ func parseBingNews(body []byte) (Response, error) {
 	}
 	var results []Result
 	pos := 0
-	doc.Find("div.news-card, div.t_s, div.newsitem").Each(func(_ int, s *goquery.Selection) {
-		linkEl := s.Find("a.title, a[data-href], h2 a, a").First()
-		title := strings.TrimSpace(linkEl.Text())
-		href, _ := linkEl.Attr("href")
-		if href == "" {
-			href, _ = linkEl.Attr("data-href")
-		}
-		snippet := strings.TrimSpace(s.Find(".snippet, .description").First().Text())
-		if title == "" || href == "" {
-			return
-		}
-		published := strings.TrimSpace(s.Find(".source span, .t_s_sn").First().Text())
-		extras := map[string]string{}
-		if published != "" {
-			extras[ExtraPublishedAt] = published
-		}
-		pos++
-		results = append(results, Result{
-			Title:    title,
-			URL:      href,
-			Snippet:  snippet,
-			Engine:   "bing",
-			Position: pos,
-			Extras:   extras,
+	seen := map[string]struct{}{}
+	doc.Find("div.news-card.newsitem, div.news-card, div.t_s, div.newsitem").
+		Each(func(_ int, s *goquery.Selection) {
+			href, _ := s.Attr("url")
+			if href == "" {
+				href, _ = s.Attr("data-url")
+			}
+			if href == "" {
+				href, _ = s.Find("a.title").First().Attr("href")
+			}
+			if href == "" {
+				href, _ = s.Find("a[href]").First().Attr("href")
+			}
+			if href == "" {
+				return
+			}
+			if _, dup := seen[href]; dup {
+				return
+			}
+			title, _ := s.Attr("title")
+			if title == "" {
+				title = strings.TrimSpace(
+					s.Find("a.title h2, a.title, h2.ns_hd_h2, h2").First().Text(),
+				)
+			}
+			if title == "" {
+				return
+			}
+			snippet := strings.TrimSpace(
+				s.Find(".snippet, .description, .caption p").First().Text(),
+			)
+			source, _ := s.Attr("data-author")
+			if source == "" {
+				source = strings.TrimSpace(s.Find(".source a, .source span").First().Text())
+			}
+			published := strings.TrimSpace(
+				s.Find(".ns_sc_tm, .t_s_sn, span[aria-label]").First().Text(),
+			)
+			if published == "" {
+				if al, ok := s.Find("span[aria-label]").First().Attr("aria-label"); ok {
+					published = strings.TrimSpace(al)
+				}
+			}
+			extras := map[string]string{}
+			if published != "" {
+				extras[ExtraPublishedAt] = published
+			}
+			if source != "" {
+				extras[ExtraAuthor] = source
+			}
+			pos++
+			seen[href] = struct{}{}
+			results = append(results, Result{
+				Title:    title,
+				URL:      href,
+				Snippet:  snippet,
+				Engine:   "bing",
+				Position: pos,
+				Extras:   extras,
+			})
 		})
-	})
 	if len(results) == 0 {
 		return Response{}, fmt.Errorf("bing: no news results parsed")
 	}

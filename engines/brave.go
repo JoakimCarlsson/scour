@@ -173,19 +173,36 @@ func parseBraveNews(body []byte) (Response, error) {
 	}
 	var results []Result
 	pos := 0
-	doc.Find("div.snippet[data-type='news'], div[data-type='news']").
+	seen := map[string]struct{}{}
+	doc.Find("a.news-card, div.snippet[data-type='news'], div[data-type='news']").
 		Each(func(_ int, s *goquery.Selection) {
-			linkEl := s.Find("a[href]").First()
-			href, _ := linkEl.Attr("href")
-			title := strings.TrimSpace(s.Find(".title, h3").First().Text())
-			if title == "" {
-				title = strings.TrimSpace(linkEl.Text())
+			href, _ := s.Attr("href")
+			if href == "" {
+				href, _ = s.Find("a[href]").First().Attr("href")
 			}
+			if href == "" {
+				return
+			}
+			if _, dup := seen[href]; dup {
+				return
+			}
+			title := strings.TrimSpace(
+				s.Find(".line-clamp-2, .title, h3, .news-card-title").First().Text(),
+			)
+			if title == "" {
+				title = strings.TrimSpace(s.Find("a").First().Text())
+			}
+			source := strings.TrimSpace(s.Find(".news-card-site span").First().Text())
 			snippet := strings.TrimSpace(
 				s.Find(".snippet-description, .description").First().Text(),
 			)
-			published := strings.TrimSpace(s.Find("time, .time, .date").First().Text())
-			if title == "" || href == "" {
+			if snippet == "" {
+				snippet = source
+			}
+			published := strings.TrimSpace(
+				s.Find(".news-card-metadata span, time, .time, .date").First().Text(),
+			)
+			if title == "" {
 				return
 			}
 			pos++
@@ -193,6 +210,10 @@ func parseBraveNews(body []byte) (Response, error) {
 			if published != "" {
 				extras[ExtraPublishedAt] = published
 			}
+			if source != "" {
+				extras[ExtraAuthor] = source
+			}
+			seen[href] = struct{}{}
 			results = append(results, Result{
 				Title:    title,
 				URL:      href,
