@@ -15,6 +15,11 @@ import (
 
 var googleURL = "https://www.google.com/search"
 
+// googleConsentCookie skips Google's EU/global consent interstitial. The
+// SOCS value rotates; this one was captured from a Firefox session on
+// 2026-05-15. Replace if Google starts rejecting it.
+const googleConsentCookie = "CONSENT=PENDING+987; SOCS=CAESHAgBEhJnd3NfMjAyNTAxMjMtMF9SQzMaAmVuIAEaBgiAjOq8Bg"
+
 type googleEngine struct{}
 
 func (googleEngine) Name() string { return "google" }
@@ -50,6 +55,8 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 		hl = loc
 	}
 	v.Set("hl", hl)
+	v.Set("gl", "us")
+	v.Set("pws", "0")
 	v.Set("num", "20")
 	switch q.SafeSearch {
 	case query.SafeOff:
@@ -72,9 +79,13 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	if err != nil {
 		return Response{}, err
 	}
+	req.Header.Set("Cookie", googleConsentCookie)
 	body, err := fetch(req)
 	if err != nil {
 		return Response{}, err
+	}
+	if isGoogleConsent(body) {
+		return Response{}, fmt.Errorf("google: served consent page")
 	}
 	results, err := parseGoogle(body)
 	if err != nil {
@@ -83,24 +94,69 @@ func (e googleEngine) Search(ctx context.Context, q query.Query) (Response, erro
 	return Response{Results: results}, nil
 }
 
+func isGoogleConsent(body []byte) bool {
+	return bytes.Contains(body, []byte(`id="consent-bump"`)) ||
+		bytes.Contains(body, []byte(`action="https://consent.google.com/save"`)) ||
+		bytes.Contains(body, []byte(`consent.google.com`))
+}
+
+// googleSelectors lists result-container selectors in preference order;
+// Google rotates these so we try several and stop at the first that yields
+// a non-empty result set.
+var googleSelectors = []string{
+	"div.g",
+	"div.MjjYud",
+	"div[jscontroller][data-hveid]",
+	"div.tF2Cxc",
+	"div.Gx5Zad",
+}
+
 func parseGoogle(body []byte) ([]Result, error) {
+	if isGoogleConsent(body) {
+		return nil, fmt.Errorf("google: served consent page")
+	}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
+	for _, sel := range googleSelectors {
+		results := extractGoogleResults(doc, sel)
+		if len(results) > 0 {
+			return results, nil
+		}
+	}
+	return nil, fmt.Errorf("google: no results parsed")
+}
+
+func extractGoogleResults(doc *goquery.Document, sel string) []Result {
 	var results []Result
 	pos := 0
-	doc.Find("div.g, div.MjjYud").Each(func(_ int, s *goquery.Selection) {
-		linkEl := s.Find("a[href]").First()
-		href, _ := linkEl.Attr("href")
-		if !strings.HasPrefix(href, "http") {
+	seen := map[string]struct{}{}
+	doc.Find(sel).Each(func(_ int, s *goquery.Selection) {
+		var href string
+		s.Find("a[href]").EachWithBreak(func(_ int, a *goquery.Selection) bool {
+			h, _ := a.Attr("href")
+			if strings.HasPrefix(h, "http") &&
+				!strings.HasPrefix(h, "https://webcache.googleusercontent.com") {
+				href = h
+				return false
+			}
+			return true
+		})
+		if href == "" {
+			return
+		}
+		if _, dup := seen[href]; dup {
 			return
 		}
 		title := strings.TrimSpace(s.Find("h3").First().Text())
-		snippet := strings.TrimSpace(s.Find("div[data-sncf], div.VwiC3b").First().Text())
 		if title == "" {
 			return
 		}
+		snippet := strings.TrimSpace(
+			s.Find("div[data-sncf], div.VwiC3b, div.s3v9rd, span.aCOpRe").First().Text(),
+		)
+		seen[href] = struct{}{}
 		pos++
 		results = append(results, Result{
 			Title:    title,
@@ -110,10 +166,7 @@ func parseGoogle(body []byte) ([]Result, error) {
 			Position: pos,
 		})
 	})
-	if len(results) == 0 {
-		return nil, fmt.Errorf("google: no results parsed")
-	}
-	return results, nil
+	return results
 }
 
 func init() {
