@@ -2,14 +2,19 @@ package engines
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	_ "embed"
+	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/http2"
 )
 
@@ -55,32 +60,152 @@ func gsaUserAgent() string {
 	return gsaUserAgents[rand.IntN(len(gsaUserAgents))] + " NSTNWV"
 }
 
-// httpClient is shared by every engine and forces HTTP/2 ALPN when the
-// server supports it. Plain http.DefaultTransport also negotiates h2,
-// but constructing the Transport explicitly lets us pin TLS / proxy
-// settings and gives the h2 wire test something deterministic to assert.
-var httpClient = func() *http.Client {
-	t := &http.Transport{
-		ForceAttemptHTTP2:   true,
-		MaxIdleConns:        100,
-		IdleConnTimeout:     90 * time.Second,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:     &tls.Config{NextProtos: []string{"h2", "http/1.1"}},
-	}
-	// Explicitly register the HTTP/2 transport so ForceAttemptHTTP2 has a
-	// matching protocol handler. Without this, a custom Transport
-	// negotiates ALPN but falls back to HTTP/1.1 anyway.
-	_ = http2.ConfigureTransport(t)
-	return &http.Client{
-		Transport: t,
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return http.ErrUseLastResponse
-			}
-			return nil
+// utlsDialTLS performs a uTLS handshake against addr using a Chrome
+// ClientHello with ALPN h2+http/1.1. Go's crypto/tls produces a handshake
+// shape that anti-bot systems (Google's JS wall, DataDome on Qwant) flag
+// instantly; mimicking Chrome's exact cipher suite order, extensions,
+// GREASE values, and ALPN list defeats the fingerprint check at the
+// transport layer so every engine inherits the bypass without per-engine
+// wiring.
+func utlsDialTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+	return utlsDialTLSWithALPN(ctx, network, addr, []string{"h2", "http/1.1"})
+}
+
+// httpClient is shared by every engine. uTLS is used for outgoing TLS
+// so handshakes look like Chrome instead of Go's crypto/tls defaults;
+// a small switching RoundTripper picks http2.Transport when the host's
+// ALPN negotiated h2, falling back to a plain http.Transport (still
+// uTLS-dialed but speaking HTTP/1.1) for hosts that don't.
+var httpClient = &http.Client{
+	Transport: &utlsRoundTripper{
+		h2: &http2.Transport{
+			AllowHTTP:          false,
+			DisableCompression: false,
+			DialTLSContext: func(ctx context.Context, network, addr string, _ *utlsTLSConfig) (net.Conn, error) {
+				return dialUTLSForALPN(ctx, network, addr, "h2")
+			},
 		},
+		h1: &http.Transport{
+			MaxIdleConns:        100,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialUTLSForALPN(ctx, network, addr, "http/1.1")
+			},
+		},
+	},
+	CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	},
+}
+
+// utlsTLSConfig is just *tls.Config under a different name. http2's
+// DialTLSContext signature wants a *tls.Config but we ignore it: the
+// real config lives inside dialUTLSForALPN. The type alias keeps the
+// signature happy without dragging crypto/tls into our top-level imports.
+type utlsTLSConfig = tls.Config
+
+// utlsRoundTripper picks an inner RoundTripper based on the request's
+// host. h2 is preferred; on a confirmed-h1 host (per the h2 cache) it
+// drops through to the plain h1 transport. The host cache is populated
+// lazily as we observe ALPN outcomes.
+type utlsRoundTripper struct {
+	h2 *http2.Transport
+	h1 *http.Transport
+
+	mu sync.RWMutex
+	// h1Hosts records hosts where h2 failed and we should skip it next time.
+	h1Hosts map[string]struct{}
+}
+
+func (rt *utlsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	host := req.URL.Host
+	rt.mu.RLock()
+	_, isH1 := rt.h1Hosts[host]
+	rt.mu.RUnlock()
+	if isH1 || req.URL.Scheme == "http" {
+		return rt.h1.RoundTrip(req)
 	}
-}()
+	resp, err := rt.h2.RoundTrip(req)
+	if err == nil {
+		return resp, nil
+	}
+	// Distinguish protocol-fallback failures from real errors. A host
+	// that doesn't speak h2 surfaces as either a uTLS handshake that
+	// negotiates http/1.1 (caught in dialUTLSForALPN) or http2.Transport
+	// rejecting the conn. Cache the result and retry on h1.
+	if isProtocolFallback(err) {
+		rt.mu.Lock()
+		if rt.h1Hosts == nil {
+			rt.h1Hosts = map[string]struct{}{}
+		}
+		rt.h1Hosts[host] = struct{}{}
+		rt.mu.Unlock()
+		return rt.h1.RoundTrip(req)
+	}
+	return resp, err
+}
+
+func isProtocolFallback(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "http2: unsupported scheme") ||
+		strings.Contains(s, "alpn protocol mismatch") ||
+		strings.Contains(s, "expected h2 alpn")
+}
+
+// dialUTLSForALPN dials with uTLS and only returns a conn if the
+// negotiated ALPN matches wantProto. Lets the caller (h2 transport vs
+// h1 transport) refuse a conn that doesn't speak its protocol.
+func dialUTLSForALPN(ctx context.Context, network, addr, wantProto string) (net.Conn, error) {
+	conn, err := utlsDialTLSWithALPN(ctx, network, addr, []string{"h2", "http/1.1"})
+	if err != nil {
+		return nil, err
+	}
+	got := conn.ConnectionState().NegotiatedProtocol
+	if got == "" {
+		// No ALPN at all - treat as http/1.1
+		got = "http/1.1"
+	}
+	if got != wantProto {
+		conn.Close()
+		return nil, fmt.Errorf("alpn protocol mismatch: got %q, want %q", got, wantProto)
+	}
+	return conn, nil
+}
+
+// utlsDialTLSWithALPN is utlsDialTLS but with a caller-chosen ALPN list.
+func utlsDialTLSWithALPN(
+	ctx context.Context,
+	network, addr string,
+	alpn []string,
+) (*utls.UConn, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	raw, err := dialer.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	cfg := &utls.Config{ServerName: host, NextProtos: alpn}
+	conn := utls.UClient(raw, cfg, utls.HelloChrome_Auto)
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	if err := conn.HandshakeContext(ctx); err != nil {
+		raw.Close()
+		return nil, fmt.Errorf("utls handshake: %w", err)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	return conn, nil
+}
 
 func fetch(req *http.Request) ([]byte, error) {
 	_, body, err := fetchWithHeaders(req)
