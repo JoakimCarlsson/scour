@@ -1,7 +1,5 @@
 # scour
 
-A Go reimplementation of [SearXNG](https://github.com/searxng/searxng): a metasearch engine that aggregates results from multiple upstream search engines without tracking the user.
-
 ## Quick start
 
 ```sh
