@@ -9,5 +9,4 @@ var bangRegistry = map[string]string{
 	"mj":  "mojeek",
 	"sp":  "startpage",
 	"ya":  "yandex",
-	"sx":  "searx_public",
 }
