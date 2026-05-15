@@ -13,7 +13,7 @@ import (
 	"github.com/JoakimCarlsson/scour/query"
 )
 
-const braveURL = "https://search.brave.com/search"
+var braveURL = "https://search.brave.com/search"
 
 type braveEngine struct{}
 
@@ -26,14 +26,31 @@ func (braveEngine) Categories() []query.Category {
 		query.CategoryVideos,
 	}
 }
-func (braveEngine) Languages() []string { return []string{"*"} }
-func (braveEngine) Weight() float64     { return 1.0 }
+func (braveEngine) Languages() LanguageTraits {
+	return LanguageTraits{
+		All: true,
+		Supported: map[string]string{
+			"en":    "us",
+			"en-us": "us",
+			"en-gb": "gb",
+			"de":    "de",
+			"fr":    "fr",
+			"es":    "es",
+			"ja":    "jp",
+			"zh-cn": "cn",
+		},
+	}
+}
+func (braveEngine) Weight() float64 { return 1.0 }
 
 func (e braveEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
 	u, _ := url.Parse(braveURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
 	v.Set("source", "web")
+	if loc, ok := e.Languages().Native(q.Language); ok {
+		v.Set("country", loc)
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

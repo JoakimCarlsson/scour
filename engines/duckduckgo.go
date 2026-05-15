@@ -13,7 +13,7 @@ import (
 	"github.com/JoakimCarlsson/scour/query"
 )
 
-const duckduckgoURL = "https://html.duckduckgo.com/html/"
+var duckduckgoURL = "https://html.duckduckgo.com/html/"
 
 type duckduckgoEngine struct{}
 
@@ -26,13 +26,31 @@ func (duckduckgoEngine) Categories() []query.Category {
 		query.CategoryVideos,
 	}
 }
-func (duckduckgoEngine) Languages() []string { return []string{"*"} }
-func (duckduckgoEngine) Weight() float64     { return 1.0 }
+func (duckduckgoEngine) Languages() LanguageTraits {
+	return LanguageTraits{
+		All: true,
+		Supported: map[string]string{
+			"en":    "us-en",
+			"en-us": "us-en",
+			"en-gb": "uk-en",
+			"de":    "de-de",
+			"fr":    "fr-fr",
+			"es":    "es-es",
+			"ja":    "jp-jp",
+			"zh-cn": "cn-zh",
+		},
+	}
+}
+func (duckduckgoEngine) Weight() float64 { return 1.0 }
 
 func (e duckduckgoEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
 	form := url.Values{}
 	form.Set("q", q.Terms)
-	form.Set("kl", "us-en")
+	kl := "us-en"
+	if loc, ok := e.Languages().Native(q.Language); ok {
+		kl = loc
+	}
+	form.Set("kl", kl)
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,

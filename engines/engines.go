@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/JoakimCarlsson/scour/query"
 )
@@ -16,10 +17,34 @@ type Result struct {
 	Position int
 }
 
+type LanguageTraits struct {
+	All       bool
+	Supported map[string]string
+}
+
+func (t LanguageTraits) Accepts(bcp47 string) bool {
+	if bcp47 == "" {
+		return true
+	}
+	if t.All {
+		return true
+	}
+	_, ok := t.Supported[strings.ToLower(bcp47)]
+	return ok
+}
+
+func (t LanguageTraits) Native(bcp47 string) (string, bool) {
+	if bcp47 == "" {
+		return "", false
+	}
+	v, ok := t.Supported[strings.ToLower(bcp47)]
+	return v, ok
+}
+
 type Engine interface {
 	Name() string
 	Categories() []query.Category
-	Languages() []string
+	Languages() LanguageTraits
 	Weight() float64
 	Search(ctx context.Context, q query.Query) ([]Result, error)
 }

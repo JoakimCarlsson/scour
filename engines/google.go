@@ -13,7 +13,7 @@ import (
 	"github.com/JoakimCarlsson/scour/query"
 )
 
-const googleURL = "https://www.google.com/search"
+var googleURL = "https://www.google.com/search"
 
 type googleEngine struct{}
 
@@ -27,14 +27,32 @@ func (googleEngine) Categories() []query.Category {
 		query.CategoryMap,
 	}
 }
-func (googleEngine) Languages() []string { return []string{"*"} }
-func (googleEngine) Weight() float64     { return 1.0 }
+func (googleEngine) Languages() LanguageTraits {
+	return LanguageTraits{
+		All: true,
+		Supported: map[string]string{
+			"en":    "en",
+			"en-us": "en",
+			"en-gb": "en",
+			"de":    "de",
+			"fr":    "fr",
+			"es":    "es",
+			"ja":    "ja",
+			"zh-cn": "zh-CN",
+		},
+	}
+}
+func (googleEngine) Weight() float64 { return 1.0 }
 
 func (e googleEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
 	u, _ := url.Parse(googleURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
-	v.Set("hl", "en")
+	hl := "en"
+	if loc, ok := e.Languages().Native(q.Language); ok {
+		hl = loc
+	}
+	v.Set("hl", hl)
 	v.Set("num", "20")
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

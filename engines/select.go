@@ -3,7 +3,6 @@ package engines
 import (
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/JoakimCarlsson/scour/query"
 )
@@ -50,17 +49,5 @@ func supportsCategory(e Engine, c query.Category) bool {
 }
 
 func supportsLanguage(e Engine, lang string) bool {
-	if lang == "" {
-		return true
-	}
-	want := strings.ToLower(lang)
-	for _, l := range e.Languages() {
-		if l == "*" {
-			return true
-		}
-		if strings.ToLower(l) == want {
-			return true
-		}
-	}
-	return false
+	return e.Languages().Accepts(lang)
 }

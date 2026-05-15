@@ -20,8 +20,10 @@ type countingEngine struct {
 func (e countingEngine) Name() string { return e.name }
 
 func (e countingEngine) Categories() []query.Category { return []query.Category{query.CategoryGeneral} }
-func (e countingEngine) Languages() []string          { return []string{"*"} }
-func (e countingEngine) Weight() float64              { return 1.0 }
+func (e countingEngine) Languages() engines.LanguageTraits {
+	return engines.LanguageTraits{All: true}
+}
+func (e countingEngine) Weight() float64 { return 1.0 }
 func (e countingEngine) Search(_ context.Context, _ query.Query) ([]engines.Result, error) {
 	atomic.AddInt32(e.calls, 1)
 	return []engines.Result{

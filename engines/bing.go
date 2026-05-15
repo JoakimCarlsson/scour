@@ -13,7 +13,7 @@ import (
 	"github.com/JoakimCarlsson/scour/query"
 )
 
-const bingURL = "https://www.bing.com/search"
+var bingURL = "https://www.bing.com/search"
 
 type bingEngine struct{}
 
@@ -26,14 +26,31 @@ func (bingEngine) Categories() []query.Category {
 		query.CategoryVideos,
 	}
 }
-func (bingEngine) Languages() []string { return []string{"*"} }
-func (bingEngine) Weight() float64     { return 1.0 }
+func (bingEngine) Languages() LanguageTraits {
+	return LanguageTraits{
+		All: true,
+		Supported: map[string]string{
+			"en":    "en-US",
+			"en-us": "en-US",
+			"en-gb": "en-GB",
+			"de":    "de-DE",
+			"fr":    "fr-FR",
+			"es":    "es-ES",
+			"ja":    "ja-JP",
+			"zh-cn": "zh-CN",
+		},
+	}
+}
+func (bingEngine) Weight() float64 { return 1.0 }
 
 func (e bingEngine) Search(ctx context.Context, q query.Query) ([]Result, error) {
 	u, _ := url.Parse(bingURL)
 	v := u.Query()
 	v.Set("q", q.Terms)
 	v.Set("form", "QBLH")
+	if loc, ok := e.Languages().Native(q.Language); ok {
+		v.Set("setlang", loc)
+	}
 	u.RawQuery = v.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

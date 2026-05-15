@@ -3,6 +3,7 @@ package engines
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/JoakimCarlsson/scour/query"
@@ -11,13 +12,13 @@ import (
 type stubEngine struct {
 	name       string
 	categories []query.Category
-	languages  []string
+	languages  LanguageTraits
 	weight     float64
 }
 
 func (s stubEngine) Name() string                 { return s.name }
 func (s stubEngine) Categories() []query.Category { return s.categories }
-func (s stubEngine) Languages() []string          { return s.languages }
+func (s stubEngine) Languages() LanguageTraits    { return s.languages }
 func (s stubEngine) Weight() float64              { return s.weight }
 func (s stubEngine) Search(_ context.Context, _ query.Query) ([]Result, error) {
 	return nil, nil
@@ -112,26 +113,33 @@ func TestSelectIsDeterministic(t *testing.T) {
 }
 
 func TestSupportsLanguage(t *testing.T) {
+	mk := func(all bool, langs ...string) LanguageTraits {
+		m := map[string]string{}
+		for _, l := range langs {
+			m[strings.ToLower(l)] = l
+		}
+		return LanguageTraits{All: all, Supported: m}
+	}
 	tests := []struct {
-		name      string
-		engineLng []string
-		queryLng  string
-		want      bool
+		name     string
+		traits   LanguageTraits
+		queryLng string
+		want     bool
 	}{
-		{"wildcard matches any", []string{"*"}, "en", true},
-		{"empty query language matches anything", []string{"en"}, "", true},
-		{"exact match", []string{"en", "fr"}, "fr", true},
-		{"case-insensitive match", []string{"en-US"}, "en-us", true},
-		{"no match returns false", []string{"en", "fr"}, "ja", false},
-		{"empty engine list rejects non-empty query", []string{}, "en", false},
+		{"all-true matches any", mk(true), "en", true},
+		{"empty query language matches anything", mk(false, "en"), "", true},
+		{"exact match", mk(false, "en", "fr"), "fr", true},
+		{"case-insensitive match", mk(false, "en-US"), "en-us", true},
+		{"no match returns false", mk(false, "en", "fr"), "ja", false},
+		{"empty engine map rejects non-empty query", mk(false), "en", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			e := stubEngine{languages: tc.engineLng}
+			e := stubEngine{languages: tc.traits}
 			if got := supportsLanguage(e, tc.queryLng); got != tc.want {
 				t.Fatalf(
 					"supportsLanguage(%v, %q) = %v, want %v",
-					tc.engineLng,
+					tc.traits,
 					tc.queryLng,
 					got,
 					tc.want,
