@@ -92,9 +92,19 @@ func TestSelect(t *testing.T) {
 			want: []string{"bing", "brave", "google", "qwant"},
 		},
 		{
-			name: "map category returns nothing",
+			name: "map category returns map-capable engines",
 			q:    query.Query{Category: query.CategoryMap},
-			want: nil,
+			want: []string{"nominatim"},
+		},
+		{
+			name: "it category returns IT engines",
+			q:    query.Query{Category: query.CategoryIT},
+			want: []string{"hackernews"},
+		},
+		{
+			name: "science category returns science engines",
+			q:    query.Query{Category: query.CategoryScience},
+			want: []string{"arxiv", "openalex"},
 		},
 		{
 			name: "music category returns empty slice",
