@@ -19,6 +19,23 @@ func TestNormalize(t *testing.T) {
 		{"https://example.com/a/b/", "https://example.com/a/b"},
 		{"https://example.com/?fbclid=abc&q=keep", "https://example.com/?q=keep"},
 		{"https://example.com/?utm_a=1&utm_b=2", "https://example.com/"},
+		// www. prefix stripped (3+ labels)
+		{"https://www.example.com/foo", "https://example.com/foo"},
+		{"https://WWW.Example.com/foo", "https://example.com/foo"},
+		// www. preserved when it's the apex (2 labels)
+		{"https://www.com/foo", "https://www.com/foo"},
+		// default ports stripped
+		{"https://example.com:443/foo", "https://example.com/foo"},
+		{"http://example.com:80/foo", "http://example.com/foo"},
+		// non-default ports preserved
+		{"https://example.com:8443/foo", "https://example.com:8443/foo"},
+		// broader tracker list
+		{"https://example.com/?ref_src=twitter&q=keep", "https://example.com/?q=keep"},
+		{"https://example.com/?mkt_tok=abc&q=keep", "https://example.com/?q=keep"},
+		{"https://example.com/?pk_campaign=x&q=keep", "https://example.com/?q=keep"},
+		{"https://example.com/?_hsenc=x&__hstc=y&q=keep", "https://example.com/?q=keep"},
+		// query params sorted by key (Go's url.Values.Encode behaviour)
+		{"https://example.com/?z=1&a=2&m=3", "https://example.com/?a=2&m=3&z=1"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.in, func(t *testing.T) {
