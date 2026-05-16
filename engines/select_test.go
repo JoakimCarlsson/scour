@@ -104,7 +104,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "it category returns IT engines",
 			q:    query.Query{Category: query.CategoryIT},
-			want: []string{"hackernews"},
+			want: []string{"hackernews", "stackexchange"},
 		},
 		{
 			name: "science category returns science engines",
