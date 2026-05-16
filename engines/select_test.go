@@ -114,7 +114,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "social category returns social engines",
 			q:    query.Query{Category: query.CategorySocial},
-			want: []string{"reddit"},
+			want: []string{"lemmy", "reddit"},
 		},
 		{
 			name: "music category returns music engines",
