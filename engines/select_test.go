@@ -112,9 +112,9 @@ func TestSelect(t *testing.T) {
 			want: []string{"reddit"},
 		},
 		{
-			name: "music category returns empty slice",
+			name: "music category returns music engines",
 			q:    query.Query{Category: query.CategoryMusic},
-			want: nil,
+			want: []string{"radiobrowser"},
 		},
 		{
 			name: "wildcard language engines match any language",
