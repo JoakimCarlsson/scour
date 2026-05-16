@@ -119,7 +119,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "music category returns music engines",
 			q:    query.Query{Category: query.CategoryMusic},
-			want: []string{"radiobrowser"},
+			want: []string{"mixcloud", "radiobrowser"},
 		},
 		{
 			name: "wildcard language engines match any language",
