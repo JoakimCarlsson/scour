@@ -94,7 +94,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "videos category returns videos engines",
 			q:    query.Query{Category: query.CategoryVideos},
-			want: []string{"sepiasearch"},
+			want: []string{"invidious", "sepiasearch"},
 		},
 		{
 			name: "map category returns map-capable engines",
