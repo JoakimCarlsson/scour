@@ -92,6 +92,11 @@ func TestSelect(t *testing.T) {
 			want: []string{"bing", "brave", "google", "qwant"},
 		},
 		{
+			name: "videos category returns videos engines",
+			q:    query.Query{Category: query.CategoryVideos},
+			want: []string{"sepiasearch"},
+		},
+		{
 			name: "map category returns map-capable engines",
 			q:    query.Query{Category: query.CategoryMap},
 			want: []string{"nominatim"},
