@@ -107,6 +107,11 @@ func TestSelect(t *testing.T) {
 			want: []string{"arxiv", "openalex"},
 		},
 		{
+			name: "social category returns social engines",
+			q:    query.Query{Category: query.CategorySocial},
+			want: []string{"reddit"},
+		},
+		{
 			name: "music category returns empty slice",
 			q:    query.Query{Category: query.CategoryMusic},
 			want: nil,
