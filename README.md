@@ -96,7 +96,7 @@ All operators are case-insensitive. They land on `query.Query.Filters` as struct
 | `mixcloud` | music | DJ sets and podcasts |
 | `sepiasearch` | videos | PeerTube federation |
 | `invidious` | videos | YouTube via Invidious instances; canonical youtube.com URLs |
-| `reddit` | social | search.json, requires app-identifying UA |
+| `reddit` | social | search.json |
 | `lemmy` | social | Federated Reddit alt; rotates across known instances |
 
 Live status varies — some engines (Google, Qwant, Yandex) periodically rate-limit. The pipeline's suspension layer drops a blocked engine for a cooldown window so it doesn't waste the fan-out timeout on subsequent queries.
@@ -106,16 +106,16 @@ Live status varies — some engines (Google, Qwant, Yandex) periodically rate-li
 ### Pretty (default)
 
 ```
-1. [score=2.50] Pornhub.com
-   https://www.pornhub.com/
+1. [score=2.50] The Go Programming Language
+   https://go.dev/
    sources: bing@1, brave@2, duckduckgo@1
 
-2. [score=1.67] Pornhub - Wikipedia
-   https://en.wikipedia.org/wiki/Pornhub
+2. [score=1.67] Go (programming language) - Wikipedia
+   https://en.wikipedia.org/wiki/Go_(programming_language)
    sources: bing@3, brave@1, duckduckgo@3
 ...
 Did you mean:
-  - did you mean term 1
+  - golang tutorial
 ```
 
 The `score` is the sum of `1 / position` across each engine that returned the result (weighted by engine weight). `sources: engine@pos` lists the rank each engine assigned. A page seen at #1 by three engines outranks any page only one engine returned.
