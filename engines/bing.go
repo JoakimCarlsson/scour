@@ -3,6 +3,7 @@ package engines
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -121,6 +122,35 @@ func parseBingSuggestions(body []byte) []string {
 	return sugs
 }
 
+// unwrapBingRedirect pulls the real destination out of Bing's
+// https://www.bing.com/ck/a?...&u=a1<base64url>&ver=2 redirect wrapper.
+// The `u` query param carries the real URL prefixed with "a1" and
+// base64url-encoded without padding. Returns the input unchanged if it
+// isn't a bing.com/ck/a wrapper or decoding fails.
+func unwrapBingRedirect(href string) string {
+	if !strings.Contains(href, "bing.com/ck/a") {
+		return href
+	}
+	u, err := url.Parse(href)
+	if err != nil {
+		return href
+	}
+	uParam := u.Query().Get("u")
+	if !strings.HasPrefix(uParam, "a1") {
+		return href
+	}
+	encoded := uParam[2:]
+	// Restore base64 padding (urlsafe-base64 without padding).
+	if pad := len(encoded) % 4; pad != 0 {
+		encoded += strings.Repeat("=", 4-pad)
+	}
+	decoded, err := base64.URLEncoding.DecodeString(encoded)
+	if err != nil {
+		return href
+	}
+	return string(decoded)
+}
+
 func parseBing(body []byte) ([]Result, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
@@ -132,6 +162,7 @@ func parseBing(body []byte) ([]Result, error) {
 		titleEl := s.Find("h2 a").First()
 		title := strings.TrimSpace(titleEl.Text())
 		href, _ := titleEl.Attr("href")
+		href = unwrapBingRedirect(href)
 		snippet := strings.TrimSpace(s.Find(".b_caption p").First().Text())
 		if title == "" || href == "" {
 			return
@@ -255,6 +286,7 @@ func parseBingNews(body []byte) (Response, error) {
 			if href == "" {
 				return
 			}
+			href = unwrapBingRedirect(href)
 			if _, dup := seen[href]; dup {
 				return
 			}
