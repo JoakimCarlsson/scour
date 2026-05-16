@@ -99,7 +99,7 @@ func TestSelect(t *testing.T) {
 		{
 			name: "map category returns map-capable engines",
 			q:    query.Query{Category: query.CategoryMap},
-			want: []string{"nominatim"},
+			want: []string{"nominatim", "photon"},
 		},
 		{
 			name: "it category returns IT engines",
