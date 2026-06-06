@@ -3,12 +3,14 @@ module github.com/JoakimCarlsson/scour
 go 1.26.1
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.2
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/refraction-networking/utls v1.8.2
 	golang.org/x/net v0.52.0
 )
 
 require (
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
